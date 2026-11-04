@@ -1,0 +1,37 @@
+SOLSCRIBE  |  WINDOWS LIVE TRANSCRIPTION & MEETING APP
+====================================================
+
+QUICK START (Windows 10 / 11)
+
+1. Extract the SolScribe ZIP.
+2. Install Python 3.11 (64-bit) from python.org if you do not already have it.
+3. Double-click run_windows.bat. It installs packages and opens the desktop app.
+4. LIVE: Choose a microphone, keep the Live transcription checkbox checked,
+   then click "Record + live captions". Spoken words appear in batches.
+5. STOP: Click "Stop recording". Use "Transcribe" to polish the final transcript
+   from the complete saved audio (optional, recommended for formal records).
+6. VOICE MEMO: Import an existing WAV, MP3, M4A, MP4 etc. and click "Transcribe".
+7. NOTES: Select "Paste spoken notes" to turn existing text into documents.
+8. Click "Generate summary + minutes + memo". Review the four document tabs.
+9. Export PDF, Word DOCX, Markdown, text, SRT subtitles or full project JSON.
+
+To build a portable Windows app without opening Python manually:
+  Double-click build_windows.bat on Windows.
+  The app will be at dist\SolScribe\SolScribe.exe. Keep its full folder.
+
+To build a Windows .exe setup automatically through GitHub Actions:
+  Upload all files INCLUDING the hidden .github directory to a new repository,
+  open Actions > Build SolScribe for Windows > Run workflow,
+  download the SolScribe-Windows artifact from the successful run.
+
+IMPORTANT
+- The first model download needs internet; thereafter transcription is local.
+- Live captions arrive in CHUNKS, with extra CPU processing delay.
+- For 8 GB RAM, use 'tiny' for speed or 'base' for a balance of accuracy/speed.
+- Recordings, transcripts, and summaries remain on the PC by default.
+- Full local AI context summaries are optional via Ollama (ollama.com).
+- Simultaneous PC playback + microphone capture is not supported in this build.
+- Automatic speaker identification is not included; edit speaker labels manually.
+- Check meeting notes for errors and obtain consent before recording others.
+
+FULL GUIDE: README.md

@@ -1,0 +1,7 @@
+PySide6>=6.8,<7
+faster-whisper>=1.1,<2
+sounddevice>=0.5,<1
+soundcard>=0.4.4,<1
+numpy>=1.26,<3
+python-docx>=1.1,<2
+reportlab>=4.2,<5
