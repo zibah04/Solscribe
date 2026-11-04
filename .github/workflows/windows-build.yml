@@ -11,11 +11,14 @@ on:
       - 'assets/**'
       - 'build_windows.bat'
       - 'SolScribe.iss'
+      - 'tests/**'
+      - 'scripts/**'
       - '.github/workflows/windows-build.yml'
 
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -28,6 +31,9 @@ jobs:
           architecture: 'x64'
       - name: Run core automated tests
         shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_SCALE_FACTOR: '1.5'
         run: |
           python -m pip install pytest
           python -m pip install -r requirements.txt
@@ -37,9 +43,29 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -c "from PySide6.QtWidgets import QApplication; from solscribe.ui import MainWindow; app=QApplication([]); window=MainWindow(); print(window.windowTitle()); window.close()"
+      - name: Real live speech recognition smoke test
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Speech
+          $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
+          $voice.SetOutputToWaveFile("$pwd/live-smoke.wav", $format)
+          $voice.Speak('Welcome to the meeting. We will prepare the report on Friday. This is a test of live speech captions. Please review the meeting report before sharing it.')
+          $voice.Dispose()
+          python scripts/smoke_live.py live-smoke.wav
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build portable desktop executable
         shell: cmd
         run: build_windows.bat
+      - name: Packaged executable smoke test
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_SCALE_FACTOR: '1.5'
+        run: |
+          $app = Start-Process 'dist/SolScribe/SolScribe.exe' -ArgumentList '--smoke-test' -PassThru
+          if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Packaged application timed out' }
+          if ($app.ExitCode -ne 0) { throw "Packaged application failed: $($app.ExitCode)" }
       - name: Create portable ZIP
         shell: pwsh
         run: Compress-Archive -Path 'dist/SolScribe' -DestinationPath 'SolScribe-Portable-Windows.zip' -CompressionLevel Optimal

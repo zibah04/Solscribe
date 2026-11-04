@@ -27,7 +27,7 @@ class LiveTranscriptionWorker(QThread):
     failed = Signal(str)
     
     def __init__(self, audio_queue, model_name, language, models_folder, parent=None,
-                 chunk_seconds=6.0, model_factory=None):
+                 chunk_seconds=2.0, model_factory=None):
         super().__init__(parent)
         self.audio_queue = audio_queue
         self.model_name = model_name
@@ -49,9 +49,10 @@ class LiveTranscriptionWorker(QThread):
 
     def _infer(self, model, piece):
         offset, audio = piece
-        self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
         if not self._has_speech(audio):
+            self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
             return
+        self.status.emit('Recognizing speech… captions appear here as each short batch finishes')
         segments_iter, _ = model.transcribe(
             audio, language=self.language, beam_size=1, best_of=1,
             vad_filter=False, condition_on_previous_text=False,
@@ -68,6 +69,10 @@ class LiveTranscriptionWorker(QThread):
                                  'speaker': 'Speaker', 'text': content})
         if segments:
             self.segment_batch.emit(segments)
+            self.status.emit('Listening · live captions update after about 2 seconds of audio plus processing')
+        else:
+            self.status.emit('Listening · no words recognized yet; check your microphone and language')
+        self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
 
     def run(self):
         try:
@@ -76,10 +81,10 @@ class LiveTranscriptionWorker(QThread):
                 factory = WhisperModel
             else:
                 factory = self._model_factory
-            self.status.emit(f'Loading live speech model ({self.model_name})…')
+            self.status.emit(f'Loading live model ({self.model_name}) · first use downloads it; audio is being saved')
             model = factory(self.model_name, device='cpu', compute_type='int8',
                             download_root=self.models_folder, cpu_threads=4)
-            self.status.emit('Live captions enabled · updates every few seconds')
+            self.status.emit('Listening · speak into your selected microphone; allow about 2 seconds plus processing')
             chunker = PCMChunker(self.chunk_seconds)
             while True:
                 try:
@@ -91,7 +96,7 @@ class LiveTranscriptionWorker(QThread):
                 raw, sample_rate = item
                 for piece in chunker.feed(raw, sample_rate):
                     self._infer(model, piece)
-            piece = chunker.flush()
+            piece = chunker.flush(minimum_seconds=0.05)
             if piece:
                 self._infer(model, piece)
             self.status.emit('Live captions complete · use Transcribe for a polished final transcript')

@@ -2,9 +2,9 @@
 
 **Private, offline-first LIVE speech-to-text and meeting documentation.** A native Windows 10/11 desktop app, not a website. Converts recorded conversations, meetings, lectures, voice notes and audio/video files into editable transcripts, minutes, memos, action lists and exportable documents.
 
-## Features · version 0.2
+## Features · version 0.2.1
 
-- Record from a Windows microphone into local 16 kHz WAV, with elapsed time and audio-level indicator. **Live transcription** runs in a separate worker and adds timestamped captions as the recording continues. **Live captions appear while recording**, generally in ~6-second audio chunks plus CPU processing time. Also includes experimental Windows PC-playback capture (WASAPI loopback) for online-meeting audio.
+- Record from a Windows microphone into local 16 kHz WAV, with elapsed time and audio-level indicator. **Live transcription** runs in a separate worker and adds timestamped captions as the recording continues. **Live captions appear while recording**, generally in ~2-second audio chunks plus CPU processing time. Also includes experimental Windows PC-playback capture (WASAPI loopback) for online-meeting audio.
 - Import WAV, MP3, M4A, AAC, OGG, FLAC, WEBM, MP4 and several other media formats (decode support depends on PyAV / FFmpeg).
 - Transcribe offline using **faster-whisper** (CPU int8): automatically detect language, or pick a supported language. Timestamps are kept for each transcript segment.
 - Review or edit transcript text and **manually correct speaker labels**. Click a timestamp to jump in the source recording.
@@ -16,7 +16,7 @@
 
 ## Fastest start on Windows
 
-**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.2.0.exe` from a successful workflow artifact and install normally.
+**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.2.1.exe` from a successful workflow artifact and install normally.
 
 **Option B – from this source ZIP:**
 
@@ -51,6 +51,14 @@ Keep **all files in `dist\SolScribe`** together; it is a bundled directory, not 
 
 Upload this project to a new GitHub repository, **including the hidden `.github` directory**. Select the **Actions → Build SolScribe for Windows → Run workflow**. After the workflow completes, open its run and download the **SolScribe-Windows** artifact, which contains a portable app ZIP and an installer `.exe`. GitHub workflow artifacts expire after the retention period, so store a copy for distribution.
 
+## Layout and live captions in 0.2.1
+
+- The transcript has its own large workspace. Meeting metadata is in **Meeting details**; final-transcription model and language are in **Settings**.
+- The separate **Live model** defaults to `tiny` for CPU responsiveness. Captions update after roughly two seconds of audio plus recognition time; this is not instant word-by-word dictation.
+- Loading/download, recognition, and failure messages stay visible above the transcript. First use needs an internet connection to download the selected model. The recording is still saved during loading.
+- **Example meeting** opens saved sample text; it does not listen to your microphone. To see your own speech, select the correct input and click **Record + live captions** with the checkbox enabled. Watch the input-level meter.
+- The final short audio tail is processed on Stop. Wait for queued captions to finish. Use **Transcribe** after recording to improve accuracy with the final model.
+
 ## Privacy and important limitations
 
 - By default SolScribe never sends audio or transcripts to cloud AI providers. The model downloads once; local Ollama requests go to `127.0.0.1`.
@@ -84,7 +92,7 @@ py -3.11 -m venv .venv
 
 **First transcription stuck on model loading**: the chosen model may still be downloading; test with `tiny` or `base`. A firewall may block access to Hugging Face models. If the model is already cached, internet is no longer required.
 
-**Live captions do not show up**: wait for the first speech-model download/initialization and at least six seconds of audio. Try `tiny` for faster results on older laptops, or `base` for better accuracy. Live captions require a functioning microphone/PC-audio input and will not show during imported-file transcription, which uses the separate Transcribe button.
+**Live captions do not show up**: wait for the first speech-model download/initialization and about two seconds of audio plus processing. Try `tiny` for faster results on older laptops, or `base` for better accuracy. Live captions require a functioning microphone/PC-audio input and will not show during imported-file transcription, which uses the separate Transcribe button.
 
 **Mic not available**: enable Windows *Settings → Privacy & security → Microphone* and *Let desktop apps access your microphone*. Change the mic in SolScribe's bottom-right dropdown. For capturing other participants in a Teams/Zoom meeting, choose the experimental **PC audio: ...** device from that same dropdown; this captures computer playback only.
 

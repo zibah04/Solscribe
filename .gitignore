@@ -7,3 +7,5 @@ dist/
 Output/
 *.spec
 *.db
+.smoke-models/
+live-smoke.wav

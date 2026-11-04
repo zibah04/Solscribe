@@ -19,6 +19,13 @@ def main():
     app.setFont(font)
     window = MainWindow()
     window.show()
+    if '--smoke-test' in sys.argv:
+        from faster_whisper import WhisperModel  # Verify the bundled speech engine imports.
+        app.processEvents()
+        if not window.table.isVisible() or window.table.viewport().height() < 160:
+            raise RuntimeError('Transcript is not visible in the packaged application')
+        window.close()
+        return 0
     return app.exec()
 
 
