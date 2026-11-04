@@ -1,39 +1,45 @@
-SOLSCRIBE  |  WINDOWS LIVE TRANSCRIPTION & MEETING APP
-====================================================
+SOLSCRIBE 0.3.0
+Clear words. Useful notes. Saved on your PC.
 
-QUICK START (Windows 10 / 11)
+GET STARTED
+1. Close any older copy of SolScribe.
+2. Run SolScribe-Setup-0.3.0.exe from the Output folder in this download.
+   Or extract the portable ZIP and open SolScribe.exe inside its folder.
+   The installed and portable apps do not need a separate Python installation.
+3. Choose your microphone at the bottom right, then click Record meeting.
+   Keep "Show words while I speak" checked to see your words during recording.
+4. Wait for "Listening" on first use. A speech download may be needed.
+   Words appear after a short pause; processing speed depends on your PC.
+5. Click Stop recording when you finish. Your recording stays saved.
+6. Review the transcript. Double-click any words or speaker names to edit them.
+   Improve transcript can reread the complete recording for better accuracy.
+7. Click Create notes. Edit your summary, minutes, memo or action list.
+8. Choose Save a copy for Word, PDF or text.
 
-1. Extract the SolScribe ZIP.
-2. Install Python 3.11 (64-bit) from python.org if you do not already have it.
-3. Double-click run_windows.bat. It installs packages and opens the desktop app.
-4. LIVE: Choose a microphone, keep the Show words while I speak checkbox checked,
-   then click "Record meeting". Spoken words appear in ~2-second batches plus processing time.
-   The first live model download can take longer; watch the caption status.
-   "Example meeting" is saved sample text, not microphone listening.
-5. STOP: Click "Stop recording". Use "Improve transcript" for a more accurate version
-   from the complete saved audio (optional, recommended for formal records).
-6. VOICE MEMO: Import an existing WAV, MP3, M4A, MP4 etc. and click "Create transcript".
-7. NOTES: Select "Paste spoken notes" to turn existing text into documents.
-8. Click "Create notes". Review the four document tabs.
-9. Export PDF, Word DOCX, Markdown, text, SRT subtitles or full project JSON.
+ALREADY HAVE A RECORDING OR TEXT?
+Use Add a recording for audio/video files, then Create transcript.
+Use Paste text for existing notes. Example meeting opens saved sample text;
+it does not listen to your microphone.
 
-To build a portable Windows app without opening Python manually:
-  Double-click build_windows.bat on Windows.
-  The app will be at dist\SolScribe\SolScribe.exe. Keep its full folder.
+MAKE IT YOURS
+Choose Light or Dark under Appearance at the bottom left.
+Settings contains language, speech quality and note-style preferences.
+Quick notes work immediately. Polished notes need an optional writing helper;
+if it is unavailable, SolScribe still makes quick notes and tells you.
+Names and setup commands are tucked under Advanced writing setup.
 
-To build a Windows .exe setup automatically through GitHub Actions:
-  Upload all files INCLUDING the hidden .github directory to a new repository,
-  open Actions > Build SolScribe for Windows > Run workflow,
-  download the SolScribe-Windows artifact from the successful run.
+YOUR WORK
+Changes save automatically. More contains Rename and Delete meeting.
+Open saved files shows where this PC keeps the database and recordings.
+Imported recordings stay in their original location; keep those files.
+Removing the application does not delete your saved meeting data.
+Protect this Windows account and keep backups of important recordings.
 
-IMPORTANT
-- The first model download needs internet; thereafter transcription is local.
-- Live captions arrive in short batches, with a little processing time.
-- For 8 GB RAM, use 'tiny' for speed or 'base' for a balance of accuracy/speed.
-- Recordings, transcripts, and summaries remain on the PC by default.
-- Full local AI context summaries are optional via Ollama (ollama.com).
-- Simultaneous PC playback + microphone capture is not supported in this build.
-- Automatic speaker identification is not included; edit speaker labels manually.
-- Check meeting notes for errors and obtain consent before recording others.
+BEFORE SHARING A RELEASE
+Read RELEASE_NOTES.md for what was tested and the remaining device checks.
+This installer is unsigned; a verified publisher requires code signing.
+Review recognized words and notes before relying on or sharing them.
 
-FULL GUIDE: README.md
+BUILDING FROM SOURCE
+Developers can use run_windows.bat with Python 3.11 (64-bit), or
+build_windows.bat to create an executable. See README.md for developer setup.

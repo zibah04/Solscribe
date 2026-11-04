@@ -2,7 +2,7 @@
 
 **Private, offline-first LIVE speech-to-text and meeting documentation.** A native Windows 10/11 desktop app, not a website. Converts recorded conversations, meetings, lectures, voice notes and audio/video files into editable transcripts, minutes, memos, action lists and exportable documents.
 
-## Features · version 0.2.2
+## Features · version 0.3.0
 
 - Record from a Windows microphone into local 16 kHz WAV, with elapsed time and audio-level indicator. **Live transcription** runs in a separate worker and adds timestamped captions as the recording continues. **Live captions appear while recording**, generally in ~2-second audio chunks plus CPU processing time. Also includes experimental Windows PC-playback capture (WASAPI loopback) for online-meeting audio.
 - Import WAV, MP3, M4A, AAC, OGG, FLAC, WEBM, MP4 and several other media formats (decode support depends on PyAV / FFmpeg).
@@ -16,7 +16,7 @@
 
 ## Fastest start on Windows
 
-**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.2.2.exe` from a successful workflow artifact and install normally.
+**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.3.0.exe` from a successful workflow artifact and install normally.
 
 **Option B – from this source ZIP:**
 
@@ -51,11 +51,13 @@ Keep **all files in `dist\SolScribe`** together; it is a bundled directory, not 
 
 Upload this project to a new GitHub repository, **including the hidden `.github` directory**. Select the **Actions → Build SolScribe for Windows → Run workflow**. After the workflow completes, open its run and download the **SolScribe-Windows** artifact, which contains a portable app ZIP and an installer `.exe`. GitHub workflow artifacts expire after the retention period, so store a copy for distribution.
 
-## A simpler workflow in 0.2.2
+## Release 0.3.0
 
-Record or add a recording, create a transcript, then click **Create notes**. Notes display as formatted documents that you can edit directly. Use **Save a copy** for Word or PDF.
+Switch between Light and Dark with **Appearance** at the bottom left. Both keep SolScribe's purple palette and your preference is saved. The workspace fits laptop screens, starts with helpful guidance and returns to your last meeting.
 
-Quick notes work without extra software. If you select Polished notes in Settings but the optional writing helper is unavailable, SolScribe creates quick notes automatically and tells you which style was used. Advanced writing setup is tucked away in Settings.
+Record or add a recording, review the transcript, create notes, then save a copy. Quick notes work immediately; polished notes use an optional helper. If that helper is unavailable, SolScribe makes quick notes instead and explains what happened.
+
+See [START_HERE.txt](START_HERE.txt) for the user guide and [RELEASE_NOTES.md](RELEASE_NOTES.md) for validation and public-release limits. Source builds and the installer are unsigned.
 
 ## Layout and live captions
 

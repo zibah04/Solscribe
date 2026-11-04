@@ -1,5 +1,5 @@
 #define MyAppName "SolScribe"
-#define MyAppVersion "0.2.2"
+#define MyAppVersion "0.3.0"
 #define MyAppExeName "SolScribe.exe"
 
 [Setup]
@@ -7,11 +7,12 @@ AppId={{B9B27792-080D-4B54-A0B1-6C5DBB5DE071}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=SolScribe
+MinVersion=10.0.17763
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=SolScribe-Setup-0.2.2
+OutputBaseFilename=SolScribe-Setup-0.3.0
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -26,6 +27,8 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 Source: "dist\SolScribe\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "START_HERE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\SolScribe"; Filename: "{app}\{#MyAppExeName}"

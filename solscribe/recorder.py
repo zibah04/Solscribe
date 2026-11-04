@@ -22,6 +22,7 @@ class MicrophoneRecorder:
         self.active = False
         self.live_queue = None
         self.live_dropped = 0
+        self._wave = None
 
     @staticmethod
     def devices():
@@ -39,11 +40,19 @@ class MicrophoneRecorder:
         self.level = 0
         self.error = None
         self.live_dropped = 0
+        # Open the destination before the audio stream: permission/disk failures
+        # must reach the caller rather than silently killing the writer thread.
+        self._wave = wave.open(str(self.path), 'wb')
+        self._wave.setnchannels(1)
+        self._wave.setsampwidth(2)
+        self._wave.setframerate(self.SAMPLE_RATE)
         self.active = True
         self.writer = threading.Thread(target=self._writer_loop, daemon=True)
         self.writer.start()
 
         def callback(indata, frames, time_info, status):
+            if not self.active:
+                return
             if status:
                 self.error = str(status)
             raw = indata.copy().tobytes()
@@ -61,43 +70,49 @@ class MicrophoneRecorder:
                                          device=device, callback=callback)
             self.stream.start()
         except Exception:
-            self.active = False
-            self.queue.put(None)
-            self.writer.join(timeout=5)
-            self.stream = None
+            self.stop()
             raise
 
     def _writer_loop(self):
-        with wave.open(str(self.path), 'wb') as out:
-            out.setnchannels(1)
-            out.setsampwidth(2)
-            out.setframerate(self.SAMPLE_RATE)
-            while True:
-                item = self.queue.get()
-                if item is None:
-                    break
-                raw, frames = item
-                out.writeframes(raw)
-                if self.live_queue is not None:
-                    try:
-                        self.live_queue.put_nowait((raw, self.SAMPLE_RATE))
-                    except queue.Full:
-                        # Never compromise the original recording for slow live captions.
-                        self.live_dropped += frames
-                self.frames += frames
+        try:
+            with self._wave as out:
+                while True:
+                    item = self.queue.get()
+                    if item is None:
+                        break
+                    raw, frames = item
+                    out.writeframes(raw)
+                    if self.live_queue is not None:
+                        try:
+                            self.live_queue.put_nowait((raw, self.SAMPLE_RATE))
+                        except queue.Full:
+                            self.live_dropped += frames
+                    self.frames += frames
+        except Exception as exc:
+            self.error = f'Could not save recording: {exc}'
+            self.active = False
 
     def stop(self):
-        if not self.active:
-            return self.path
         self.active = False
-        try:
-            if self.stream:
+        if self.stream:
+            try:
                 self.stream.stop()
-                self.stream.close()
-        finally:
-            self.stream = None
-            self.queue.put(None)
+            except Exception as exc:
+                self.error = self.error or str(exc)
+            finally:
+                try:
+                    self.stream.close()
+                except Exception as exc:
+                    self.error = self.error or str(exc)
+                self.stream = None
+        if self.writer and self.writer.is_alive():
+            try:
+                self.queue.put(None, timeout=2)
+            except queue.Full:
+                self.error = 'The recording could not finish writing. Please check the saved audio.'
             self.writer.join(timeout=15)
+            if self.writer.is_alive():
+                self.error = 'The recording is still being saved. Please check available disk space.'
         return self.path
 
     @property

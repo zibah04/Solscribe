@@ -4,6 +4,8 @@ from __future__ import annotations
 import html
 import json
 import re
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -12,7 +14,9 @@ from .reports import transcript_text
 
 def safe_filename(name):
     safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', (name or 'Meeting')).strip(' .-')
-    return safe[:85] or 'Meeting'
+    if re.fullmatch(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])', safe.split('.')[0], re.I):
+        safe = 'Meeting - ' + safe
+    return safe[:85].rstrip(' .') or 'Meeting'
 
 
 def srt_timestamp(seconds):
@@ -25,12 +29,14 @@ def srt_timestamp(seconds):
 
 def srt_text(segments):
     lines = []
-    for index, s in enumerate(segments, start=1):
+    index = 1
+    for s in segments:
         if not (s.get('text') or '').strip():
             continue
         start = srt_timestamp(s.get('start'))
         end = srt_timestamp(max(float(s.get('end') or 0), float(s.get('start') or 0) + .25))
         lines.extend([str(index), f'{start} --> {end}', s['text'].strip(), ''])
+        index += 1
     return '\n'.join(lines)
 
 
@@ -181,7 +187,7 @@ def write_pdf(path, content):
     doc.build(story, onFirstPage=decorate, onLaterPages=decorate)
 
 
-def export_file(path, fmt, session, section='Minutes'):
+def _write_export(path, fmt, session, section='Minutes'):
     """Returns the written output path. fmt: docx, pdf, txt, md, json, srt."""
     path = Path(path)
     fmt = fmt.lower().lstrip('.')
@@ -203,3 +209,17 @@ def export_file(path, fmt, session, section='Minutes'):
         else:
             raise ValueError(f'Unsupported export format: {fmt}')
     return path
+
+
+def export_file(path, fmt, session, section='Minutes'):
+    """Publish only a complete export; a failure leaves any existing file intact."""
+    destination = Path(path)
+    handle, temporary = tempfile.mkstemp(prefix='.solscribe-', suffix=destination.suffix,
+                                         dir=destination.parent)
+    os.close(handle)
+    try:
+        _write_export(temporary, fmt, session, section)
+        os.replace(temporary, destination)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return destination

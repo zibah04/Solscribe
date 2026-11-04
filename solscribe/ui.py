@@ -17,10 +17,12 @@ from PySide6.QtWidgets import (
     QLineEdit, QPushButton, QLabel, QListWidget, QListWidgetItem,
     QPlainTextEdit, QTextEdit, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView,
     QComboBox, QFileDialog, QMessageBox, QProgressBar, QSlider, QMenu, QCheckBox,
-    QToolButton, QAbstractItemView, QInputDialog, QApplication, QSizePolicy, QScrollArea,
+    QToolButton, QAbstractItemView, QInputDialog, QApplication, QSizePolicy, QScrollArea, QStackedWidget,
 )
 
 from .storage import Store
+from .themes import THEMES, palette, stylesheet
+from . import __version__
 from .recorder import MicrophoneRecorder, SystemLoopbackRecorder
 from .transcriber import TranscriptionWorker
 from .live import LiveTranscriptionWorker
@@ -30,67 +32,7 @@ from .exporters import export_file, safe_filename
 SUPPORTED_AUDIO = {'.wav', '.mp3', '.m4a', '.mp4', '.mpeg', '.mpga',
                    '.aac', '.ogg', '.flac', '.webm', '.wma', '.mov'}
 
-STYLE = r'''
-QWidget { background: #0B1120; color: #E7EAF4; font-family: "Segoe UI"; font-size: 10pt; }
-QLabel, QCheckBox { background: transparent; }
-QMainWindow, QWidget#AppRoot { background: #0B1120; }
-QFrame#Sidebar { background: #111A2D; border-right: 1px solid #27314B; }
-QLabel#LogoIcon { color: white; background: #7567E8; border-radius: 12px; font-size: 20pt; font-weight: bold; }
-QLabel#Brand { color: #F8F9FC; font-size: 19pt; font-weight: 700; }
-QLabel#BrandTag { color: #9EA7C0; font-size: 9pt; }
-QLabel#Eyebrow { color: #9AABC8; font-size: 9pt; font-weight: 700; letter-spacing: 1px; }
-QLabel#Hint, QLabel#Muted { color: #98A4BE; font-size: 9pt; }
-QLabel#Headline { color: white; font-size: 17pt; font-weight: 700; }
-QFrame#Panel { background: #141E32; border: 1px solid #27334D; border-radius: 15px; }
-QFrame#SettingPanel { background: #111A2C; border: 1px solid #25304B; border-radius: 11px; }
-QLabel#SettingLabel { color: #9EACC5; font-size: 9pt; }
-QLineEdit, QPlainTextEdit, QTextEdit, QComboBox { background: #0C1526; border: 1px solid #2B3856; border-radius: 8px; padding: 6px; color: #F0F2F8; selection-background-color: #7167DE; }
-QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border: 1px solid #8A7DF8; }
-QLineEdit#TitleInput { background: transparent; border: none; padding: 0px; font-size: 19pt; font-weight: 700; color: white; }
-QLineEdit#TitleInput:focus { border: none; }
-QComboBox { padding: 7px 10px; }
-QComboBox QAbstractItemView { background: #1B2740; border: 1px solid #546084; color: white; selection-background-color: #4A468B; }
-QPushButton { background: #25324A; border: 1px solid #354361; border-radius: 9px; padding: 8px 12px; color: #E8EBF6; font-weight: 600; }
-QPushButton:hover { background: #33425E; }
-QPushButton:pressed { background: #263551; }
-QPushButton:disabled { background: #1B2436; color: #63718B; border-color: #253048; }
-QPushButton#Primary { background: #7467E8; border-color: #7467E8; color: white; }
-QPushButton#Primary:hover { background: #8C81F5; }
-QPushButton#Primary:disabled { background: #1B2436; color: #63718B; border-color: #253048; }
-QCheckBox { color: #C7C2FF; font-size: 9pt; spacing: 8px; }
-QCheckBox::indicator { width: 17px; height: 17px; }
-QPushButton#Record { background: #3B2539; border-color: #75415A; color: #FFB5CC; }
-QPushButton#Record:hover { background: #60314A; }
-QPushButton#Recording { background: #B63D60; color: white; border-color: #E46C91; }
-QPushButton#Plain { background: transparent; border: 1px solid #33425E; color: #CFD6E8; }
-QPushButton#Plain:hover { background: #24324D; }
-QPushButton#Small { padding: 8px 12px; }
-QListWidget { background: transparent; border: none; outline: none; padding: 3px; }
-QListWidget::item { background: transparent; color: #C5CDE0; border-radius: 9px; padding: 11px 10px; margin: 2px 0; }
-QListWidget::item:hover { background: #202D46; }
-QListWidget::item:selected { background: #2A305D; color: #FFFFFF; border: 1px solid #554F9B; }
-QTabWidget::pane { border: 1px solid #2A3550; border-radius: 10px; background: #121B2D; top: -1px; }
-QTabBar::tab { background: transparent; color: #A3ADC5; padding: 9px 12px; font-weight: 600; border-bottom: 2px solid transparent; }
-QTabBar::tab:hover { color: white; }
-QTabBar::tab:selected { color: #C4BDFF; border-bottom: 2px solid #8D80FA; }
-QTableWidget { background: #111B2C; alternate-background-color: #172238; border: none; gridline-color: #293652; selection-background-color: #323B67; selection-color: white; }
-QTableWidget::item { padding: 8px; }
-QHeaderView::section { background: #1D2A42; color: #AEBBD2; padding: 11px; border: none; border-bottom: 1px solid #36435E; font-weight: 650; }
-QScrollBar:vertical { background: #121B2B; width: 11px; margin: 1px; }
-QScrollBar::handle:vertical { background: #34435F; border-radius: 5px; min-height: 28px; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-QScrollBar:horizontal { background: #121B2B; height: 10px; }
-QScrollBar::handle:horizontal { background: #34435F; border-radius: 5px; }
-QProgressBar { background: #27334D; border: none; border-radius: 4px; height: 7px; text-align: center; }
-QProgressBar::chunk { background: #8B7BFA; border-radius: 4px; }
-QSlider::groove:horizontal { height: 5px; background: #34435F; border-radius: 2px; }
-QSlider::handle:horizontal { background: #A69AFF; width: 12px; margin: -4px 0; border-radius: 6px; }
-QMenu { background: #18253B; border: 1px solid #3E4A64; padding: 6px; color: white; }
-QMenu::item { padding: 8px 23px; border-radius: 5px; }
-QMenu::item:selected { background: #504B92; }
-QStatusBar { color: #9CA9C1; background: #0B1120; border-top: 1px solid #25314B; }
-QMessageBox, QInputDialog, QFileDialog { background: #111B2E; }
-'''
+
 
 
 class ReportWorker(QThread):
@@ -141,12 +83,15 @@ class MainWindow(QMainWindow):
         self._notes_session_id = None
         self._notes_notice = ''
         self._notes_details = ''
+        self._save_error = ''
         self.recorder = MicrophoneRecorder()
-        self.setWindowTitle('SolScribe 0.2.2 · Meeting notes')
+        self.setWindowTitle(f'SolScribe {__version__} · Meeting notes')
         self.setMinimumSize(1000, 640)
-        self.resize(1400, 830)
-        self.setStyleSheet(STYLE)
+        available = self.screen().availableGeometry()
+        self.resize(min(1400, max(1000, available.width() - 40)),
+                    min(830, max(640, available.height() - 60)))
         self._build_ui()
+        self.set_theme(str(self.settings.value('theme', 'dark')))
         self._bind_shortcuts()
 
         self.player = QMediaPlayer(self)
@@ -165,7 +110,7 @@ class MainWindow(QMainWindow):
         self.record_timer.setInterval(180)
         self.record_timer.timeout.connect(self._refresh_recording)
         self._populate_microphones()
-        self.reload_library()
+        self.reload_library(select_id=str(self.settings.value('last_session', '')))
         if not self.session_id:
             self.new_session()
         self.statusBar().showMessage('Your recordings and transcripts are stored locally.', 7500)
@@ -214,16 +159,16 @@ class MainWindow(QMainWindow):
         brand_row.addStretch(1)
         sidebar.addLayout(brand_row)
         sidebar.addSpacing(13)
-        self.new_btn = self._button('＋  New session', 'Primary')
+        self.new_btn = self._button('New meeting', 'Primary')
         self.new_btn.clicked.connect(self.new_session)
         sidebar.addWidget(self.new_btn)
-        self.import_btn = self._button('↥  Add a recording', 'Plain')
+        self.import_btn = self._button('Add a recording', 'Plain')
         self.import_btn.clicked.connect(self.import_audio)
         sidebar.addWidget(self.import_btn)
-        self.record_btn = self._button('●  Record meeting', 'Record')
+        self.record_btn = self._button('Record meeting', 'Record')
         self.record_btn.clicked.connect(self.toggle_record)
         sidebar.addWidget(self.record_btn)
-        self.paste_btn = self._button('≡  Paste text', 'Plain')
+        self.paste_btn = self._button('Paste text', 'Plain')
         self.paste_btn.clicked.connect(self.paste_text)
         sidebar.addWidget(self.paste_btn)
         sidebar.addSpacing(8)
@@ -237,14 +182,25 @@ class MainWindow(QMainWindow):
         self.library.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.library.currentItemChanged.connect(self._on_library_selected)
         sidebar.addWidget(self.library, 1)
-        self.demo_btn = self._button('✦  Example meeting', 'Plain')
+        self.demo_btn = self._button('Example meeting', 'Plain')
         self.demo_btn.setToolTip('Opens a saved sample transcript, not a live microphone demo.')
         self.demo_btn.clicked.connect(self.load_demo)
         sidebar.addWidget(self.demo_btn)
-        self.folder_btn = self._button('▣  Open local data folder', 'Plain')
+        self.folder_btn = self._button('Open saved files', 'Plain')
         self.folder_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.store.root))))
         sidebar.addWidget(self.folder_btn)
-        sidebar.addWidget(self._label('PRIVATE · STORED ON THIS PC', 'Hint'))
+        theme_row = QHBoxLayout()
+        theme_label = self._label('Appearance', 'Hint')
+        theme_row.addWidget(theme_label)
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItem('Dark', 'dark')
+        self.theme_combo.addItem('Light', 'light')
+        self.theme_combo.setAccessibleName('Appearance')
+        theme_label.setBuddy(self.theme_combo)
+        self.theme_combo.currentIndexChanged.connect(lambda _: self.set_theme(self.theme_combo.currentData()))
+        theme_row.addWidget(self.theme_combo, 1)
+        sidebar.addLayout(theme_row)
+        sidebar.addWidget(self._label('Private · saved on this PC', 'Hint'))
 
         content = QWidget()
         outer.addWidget(content, 1)
@@ -261,10 +217,11 @@ class MainWindow(QMainWindow):
         self.title_edit.textChanged.connect(self.schedule_save)
         title_stack.addWidget(self.title_edit)
         header.addLayout(title_stack, 1)
-        self.delete_btn = self._button('Delete', 'Plain')
-        self.delete_btn.clicked.connect(self.delete_session)
+        self.delete_btn = self._button('More', 'Plain')
+        self.delete_btn.setAccessibleName('Meeting options')
+        self.delete_btn.clicked.connect(self.show_meeting_menu)
         header.addWidget(self.delete_btn)
-        self.export_btn = self._button('↓  Save a copy', 'Plain')
+        self.export_btn = self._button('Save a copy', 'Plain')
         self.export_btn.clicked.connect(self.show_export_menu)
         header.addWidget(self.export_btn)
         work.addLayout(header)
@@ -282,7 +239,7 @@ class MainWindow(QMainWindow):
         self.audio_name.setMinimumWidth(0)
         left_audio.addWidget(self.audio_name)
         audio_row.addLayout(left_audio, 1)
-        self.play_btn = self._button('▶  Play', 'Small')
+        self.play_btn = self._button('Play', 'Small')
         self.play_btn.clicked.connect(self.toggle_play)
         audio_row.addWidget(self.play_btn)
         a_layout.addLayout(audio_row)
@@ -325,7 +282,7 @@ class MainWindow(QMainWindow):
             lambda _: self.settings.setValue('language', self.language_combo.currentData()))
         controls.addWidget(self.language_combo)
         controls.addStretch(1)
-        self.transcribe_btn = self._button('✦  Create transcript', 'Primary')
+        self.transcribe_btn = self._button('Create transcript', 'Primary')
         self.transcribe_btn.clicked.connect(self.transcribe)
         audio_row.addWidget(self.transcribe_btn)
         live_row = QHBoxLayout()
@@ -403,7 +360,7 @@ class MainWindow(QMainWindow):
         self.notes_details_btn.clicked.connect(self._show_note_details)
         self.notes_details_btn.hide()
         report_row.addWidget(self.notes_details_btn)
-        self.report_btn = self._button('✧  Create notes', 'Primary')
+        self.report_btn = self._button('Create notes', 'Primary')
         self.report_btn.setToolTip('Create a summary, minutes, memo and action list. You can edit everything afterward.')
         self.report_btn.clicked.connect(self.generate_reports)
         report_row.addWidget(self.report_btn)
@@ -448,7 +405,23 @@ class MainWindow(QMainWindow):
         self.table.setColumnWidth(1, 110)
         self.table.cellChanged.connect(self.schedule_save)
         self.table.cellClicked.connect(self._segment_clicked)
-        t_layout.addWidget(self.table, 1)
+        self.transcript_stack = QStackedWidget()
+        self.transcript_stack.addWidget(self.table)
+        empty = QWidget()
+        empty_layout = QVBoxLayout(empty)
+        empty_layout.setContentsMargins(22, 18, 22, 18)
+        empty_layout.addStretch(1)
+        self.empty_title = self._label('Every meeting, clearly captured.', 'Headline')
+        self.empty_title.setWordWrap(True)
+        empty_layout.addWidget(self.empty_title)
+        self.empty_hint = self._label('Record a conversation, add an audio or video file, or paste notes to get started.', 'Muted')
+        self.empty_hint.setWordWrap(True)
+        empty_layout.addWidget(self.empty_hint)
+        empty_layout.addSpacing(8)
+        empty_layout.addWidget(self._label('Capture the words  →  Review your transcript  →  Create your notes', 'Hint'))
+        empty_layout.addStretch(1)
+        self.transcript_stack.addWidget(empty)
+        t_layout.addWidget(self.transcript_stack, 1)
         self.tabs.addTab(transcript_tab, 'Transcript')
         self.doc_edits = {}
         for name in ('Summary', 'Minutes', 'Memo', 'Action items'):
@@ -523,7 +496,37 @@ class MainWindow(QMainWindow):
         work.addLayout(bottom)
         self.statusBar()
 
+        for control, name in [(self.title_edit, 'Meeting title'), (self.date_edit, 'Meeting date'),
+                              (self.attendees_edit, 'Attendees'), (self.location_edit, 'Location'),
+                              (self.chair_edit, 'Chairperson'), (self.agenda_edit, 'Agenda'),
+                              (self.model_combo, 'Transcript quality'), (self.live_model_combo, 'Caption quality'),
+                              (self.language_combo, 'Spoken language'), (self.engine_combo, 'Note style'),
+                              (self.mic_combo, 'Recording input'), (self.search_library, 'Search meetings'),
+                              (self.search_transcript, 'Search transcript'), (self.table, 'Editable transcript')]:
+            control.setAccessibleName(name)
+        for name, editor in self.doc_edits.items():
+            editor.setAccessibleName(f'{name} editor')
+
         self.setAcceptDrops(True)
+
+    def set_theme(self, name):
+        self.theme_name = name if name in THEMES else 'dark'
+        self.settings.setValue('theme', self.theme_name)
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.setCurrentIndex(self.theme_combo.findData(self.theme_name))
+        self.theme_combo.blockSignals(False)
+        self.setPalette(palette(self.theme_name))
+        QApplication.instance().setPalette(palette(self.theme_name))
+        self.setStyleSheet(stylesheet(self.theme_name))
+
+    def show_meeting_menu(self):
+        menu = QMenu(self)
+        rename = menu.addAction('Rename meeting')
+        rename.triggered.connect(lambda: (self.title_edit.setFocus(), self.title_edit.selectAll()))
+        menu.addSeparator()
+        remove = menu.addAction('Delete meeting…')
+        remove.triggered.connect(self.delete_session)
+        menu.exec(self.delete_btn.mapToGlobal(self.delete_btn.rect().bottomLeft()))
 
     def _engine_changed(self, *args):
         self.ollama_model.setEnabled(self.engine_combo.currentData() == 'ai')
@@ -544,7 +547,7 @@ class MainWindow(QMainWindow):
                          self._notes_details)
 
     def _bind_shortcuts(self):
-        for shortcut, fn in [('Ctrl+N', self.new_session), ('Ctrl+O', self.import_audio),
+        for shortcut, fn in [('Ctrl+,', lambda: self.tabs.setCurrentIndex(6)), ('Ctrl+N', self.new_session), ('Ctrl+O', self.import_audio),
                              ('Ctrl+S', self.persist), ('Ctrl+E', self.show_export_menu),
                              ('Ctrl+R', self.toggle_record)]:
             action = QAction(self)
@@ -598,18 +601,27 @@ class MainWindow(QMainWindow):
 
     def _on_library_selected(self, current, previous):
         if current is not None:
-            if self.session_id:
-                self.persist()
+            if self.session_id and not self.persist():
+                self.library.blockSignals(True)
+                for row in range(self.library.count()):
+                    if self.library.item(row).data(Qt.UserRole) == self.session_id:
+                        self.library.setCurrentRow(row)
+                        break
+                self.library.blockSignals(False)
+                return
             self.load_session(current.data(Qt.UserRole))
 
     def load_session(self, session_id):
         session = self.store.get(session_id)
         if not session:
             return
+        self.settings.setValue('last_session', session_id)
         self._loading = True
         self.session_id = session_id
         self.current_session = session
         self.title_edit.setText(session['title'])
+        self.title_edit.setCursorPosition(0)
+        self.title_edit.setToolTip(session['title'])
         self.date_edit.setText(session['meeting_date'])
         self.attendees_edit.setText(session['attendees'])
         self.location_edit.setText(session['location'])
@@ -628,7 +640,7 @@ class MainWindow(QMainWindow):
             self.table.setItem(idx, 2, QTableWidgetItem(segment.get('text') or ''))
         self.table.blockSignals(False)
         self.search_transcript.clear()
-        self.caption_status.setText('Your words are saved · record another meeting or create notes')
+        self.caption_status.setText('Your words are saved · record another meeting or create notes' if session['segments'] else 'Your transcript will appear below')
         for name, field in [('Summary', 'summary'), ('Minutes', 'minutes'), ('Memo', 'memo'), ('Action items', 'actions')]:
             self.doc_edits[name].setMarkdown(session.get(field) or '')
         path = session.get('audio_path')
@@ -639,7 +651,7 @@ class MainWindow(QMainWindow):
             self.player.setSource(QUrl.fromLocalFile(str(Path(path).resolve())))
             self.play_btn.setEnabled(True)
         else:
-            self.audio_name.setText('Recording not found' if path else 'Written notes · no recording attached')
+            self.audio_name.setText('Recording not found' if path else 'Written notes · no recording attached' if session['segments'] else 'No recording yet')
             self.audio_name.setToolTip(str(path or ''))
             self.player.setSource(QUrl())
             self.play_btn.setEnabled(False)
@@ -657,12 +669,23 @@ class MainWindow(QMainWindow):
         recording = self.record_timer.isActive()
         busy = transcribing or reporting or live_working
         has_words = bool(self.current_session and self.current_session.get('segments'))
+        self.transcript_stack.setCurrentIndex(0 if self.table.rowCount() else 1)
+        if recording or live_working:
+            self.empty_title.setText('Your words will appear here.')
+            self.empty_hint.setText('Keep speaking naturally. First use may need a speech download; your recording is being saved.')
+        elif has_audio:
+            self.empty_title.setText('Your recording is ready.')
+            self.empty_hint.setText('Choose Create transcript to turn the recording into words you can review and edit.')
+        else:
+            self.empty_title.setText('Every meeting, clearly captured.')
+            self.empty_hint.setText('Record a conversation, add an audio or video file, or paste notes to get started.')
         for control in (self.mic_combo, self.live_checkbox, self.live_model_combo, self.language_combo):
             control.setEnabled(not recording and not live_working)
         self.transcribe_btn.setEnabled((has_audio and not reporting and not recording and not live_working) or transcribing)
         if not transcribing:
-            self.transcribe_btn.setText('✦  Improve transcript' if has_words and has_audio else '✦  Create transcript')
+            self.transcribe_btn.setText('Improve transcript' if has_words and has_audio else 'Create transcript')
         self.report_btn.setEnabled(has_words and not busy and not recording)
+        self.export_btn.setEnabled(bool(has_words or any(edit.toPlainText().strip() for edit in self.doc_edits.values())) and not recording and not busy)
         for edit in self.doc_edits.values():
             edit.setReadOnly(reporting)
         has_notice = self.session_id == self._notes_session_id and bool(self._notes_notice)
@@ -683,6 +706,8 @@ class MainWindow(QMainWindow):
             hint = 'Next: click Create transcript to see the words in your recording.'
         else:
             hint = 'Record a meeting or add a recording to begin.'
+        if self._save_error:
+            hint = 'Changes are not saved yet. Check available disk space and try again.'
         self.flow_hint.setText(hint)
         self.delete_btn.setEnabled(not busy and not recording)
         for control in (self.new_btn, self.import_btn, self.paste_btn, self.demo_btn,
@@ -700,20 +725,23 @@ class MainWindow(QMainWindow):
         if self.record_timer.isActive():
             QMessageBox.warning(self, 'Recording in progress', 'Stop the recording before creating another session.')
             return
-        self.persist()
+        if not self.persist():
+            return
         session_id = self.store.create('Untitled meeting')
         self.search_library.clear()
         self.reload_library(select_id=session_id)
         self.tabs.setCurrentIndex(0)
         self.title_edit.setFocus()
         self.title_edit.selectAll()
+        return session_id
 
     def load_demo(self):
         if self._is_busy():
             return
         if self.record_timer.isActive():
             return
-        self.persist()
+        if not self.persist():
+            return
         session_id = self.store.demo()
         self.search_library.clear()
         self.reload_library(select_id=session_id)
@@ -735,7 +763,8 @@ class MainWindow(QMainWindow):
         if not path.is_file() or path.suffix.lower() not in SUPPORTED_AUDIO:
             QMessageBox.warning(self, 'Unsupported file', 'Choose a supported audio or video recording.')
             return
-        self.persist()
+        if not self.persist():
+            return
         session_id = self.store.create(path.stem.replace('_', ' '), str(path.resolve()))
         self.search_library.clear()
         self.reload_library(select_id=session_id)
@@ -751,7 +780,8 @@ class MainWindow(QMainWindow):
                             'Paste a transcript or meeting notes here:')
         if not ok or not content.strip():
             return
-        self.persist()
+        if not self.persist():
+            return
         session_id = self.store.create('Pasted meeting notes')
         lines = [line.strip() for line in content.splitlines() if line.strip()]
         segments = [{'start': 0, 'end': 0, 'speaker': 'Written notes', 'text': line} for line in lines]
@@ -762,7 +792,7 @@ class MainWindow(QMainWindow):
     def _live_option_changed(self, enabled):
         self.settings.setValue('live_captions', enabled)
         if not self.record_timer.isActive():
-            self.record_btn.setText('●  Record meeting')
+            self.record_btn.setText('Record meeting')
 
     def toggle_record(self):
         if self.record_timer.isActive():
@@ -770,7 +800,7 @@ class MainWindow(QMainWindow):
                 self.persist()
                 path = self.recorder.stop()
                 self.record_timer.stop()
-                self.record_btn.setText('●  Record meeting')
+                self.record_btn.setText('Record meeting')
                 self.record_btn.setObjectName('Record')
                 self.record_btn.style().unpolish(self.record_btn)
                 self.record_btn.style().polish(self.record_btn)
@@ -795,19 +825,28 @@ class MainWindow(QMainWindow):
                 self._show_error('Could not finish recording',
                                  'Please check your saved recording before starting another meeting.', exc)
             finally:
+                self.record_timer.stop()
+                if self._live_worker and self._live_worker.isRunning():
+                    self._live_worker.stop()
+                self.record_btn.setText('Record meeting')
+                self.record_btn.setObjectName('Record')
+                self.record_btn.style().unpolish(self.record_btn)
+                self.record_btn.style().polish(self.record_btn)
                 self.update_actions()
             return
         if self._is_busy():
             QMessageBox.information(self, 'Busy', 'Complete the current task before recording.')
             return
-        if not self.session_id:
-            self.new_session()
+        if not self.session_id and not self.new_session():
+            return
         # A new audio capture must never silently mismatch an old transcript.
         if self.current_session and (self.current_session.get('audio_path') or self.current_session.get('segments')):
-            self.new_session()
+            if not self.new_session():
+                return
             self.title_edit.setText('Meeting · ' + datetime.now().strftime('%d %b %Y %H:%M'))
             self.persist()
-        self.persist()
+        if not self.persist():
+            return
         path = self.store.recordings / f'{uuid.uuid4().hex}.wav'
         live_enabled = self.live_checkbox.isChecked()
         self._live_failed_message = None
@@ -843,7 +882,7 @@ class MainWindow(QMainWindow):
                 self.tabs.setCurrentIndex(0)
             else:
                 self.caption_status.setText('Recording only · enable live transcription before your next recording for captions')
-            self.record_btn.setText('■  Stop recording')
+            self.record_btn.setText('Stop recording')
             self.record_btn.setObjectName('Recording')
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)
@@ -895,6 +934,7 @@ class MainWindow(QMainWindow):
             self.table.setItem(row, 1, QTableWidgetItem(part.get('speaker') or 'Speaker'))
             self.table.setItem(row, 2, QTableWidgetItem(part.get('text') or ''))
         self.table.blockSignals(False)
+        self.transcript_stack.setCurrentIndex(0)
         for row in range(self.table.rowCount() - len(new_segments), self.table.rowCount()):
             self.table.setRowHidden(row, False)
         self.table.scrollToBottom()
@@ -931,7 +971,8 @@ class MainWindow(QMainWindow):
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply != QMessageBox.Yes:
                 return
-        self.persist()
+        if not self.persist():
+            return
         self._transcription_session_id = self.session_id
         self._worker = TranscriptionWorker(self.current_session['audio_path'],
                     self.model_combo.currentData(), self.language_combo.currentData(),
@@ -969,13 +1010,14 @@ class MainWindow(QMainWindow):
 
     def _transcription_finished(self):
         self.progress.hide()
-        self.transcribe_btn.setText('✦  Create transcript')
+        self.transcribe_btn.setText('Create transcript')
         self.update_actions()
 
     def generate_reports(self):
         if self._is_busy() or self.record_timer.isActive():
             return
-        self.persist()
+        if not self.persist():
+            return
         session = self.store.get(self.session_id) if self.session_id else None
         if not session:
             return
@@ -1050,7 +1092,7 @@ class MainWindow(QMainWindow):
 
     def persist(self):
         if self._loading or not self.session_id:
-            return
+            return True
         self.save_timer.stop()
         segments = []
         for row in range(self.table.rowCount()):
@@ -1063,20 +1105,33 @@ class MainWindow(QMainWindow):
                              'speaker': self.table.item(row, 1).text() if self.table.item(row, 1) else 'Speaker',
                              'text': self.table.item(row, 2).text() if self.table.item(row, 2) else ''})
         new_title = self.title_edit.text().strip() or 'Untitled meeting'
-        self.store.update(self.session_id, title=new_title, segments=segments,
-                          meeting_date=self.date_edit.text().strip(),
-                          attendees=self.attendees_edit.text().strip(),
-                          location=self.location_edit.text().strip(),
-                          chair=self.chair_edit.text().strip(),
-                          agenda=self.agenda_edit.text().strip(),
-                          summary=self.doc_edits['Summary'].toMarkdown().strip(),
-                          minutes=self.doc_edits['Minutes'].toMarkdown().strip(),
-                          memo=self.doc_edits['Memo'].toMarkdown().strip(),
-                          actions=self.doc_edits['Action items'].toMarkdown().strip())
-        self.current_session = self.store.get(self.session_id)
+        try:
+            self.store.update(self.session_id, title=new_title, segments=segments,
+                              meeting_date=self.date_edit.text().strip(),
+                              attendees=self.attendees_edit.text().strip(),
+                              location=self.location_edit.text().strip(),
+                              chair=self.chair_edit.text().strip(),
+                              agenda=self.agenda_edit.text().strip(),
+                              summary=self.doc_edits['Summary'].toMarkdown().strip(),
+                              minutes=self.doc_edits['Minutes'].toMarkdown().strip(),
+                              memo=self.doc_edits['Memo'].toMarkdown().strip(),
+                              actions=self.doc_edits['Action items'].toMarkdown().strip())
+            self.current_session = self.store.get(self.session_id)
+        except Exception as exc:
+            self._save_error = str(exc)
+            self.status_label.setText('Changes are not saved yet. Check available disk space and try again.')
+            self.update_actions()
+            return False
+        had_error = bool(self._save_error)
+        self._save_error = ''
+        if had_error:
+            self.status_label.setText('Your changes are saved.')
+            self.update_actions()
         active = self.library.currentItem()
         if active and active.data(Qt.UserRole) == self.session_id:
             active.setText(new_title + ('  ·  transcript' if segments else ''))
+        self.update_actions()
+        return True
 
     def delete_session(self):
         if self._is_busy() or self.record_timer.isActive():
@@ -1101,6 +1156,8 @@ class MainWindow(QMainWindow):
         return {0: 'Transcript', 1: 'Summary', 2: 'Minutes', 3: 'Memo', 4: 'Action items'}.get(self.tabs.currentIndex(), 'Transcript')
 
     def show_export_menu(self):
+        if not self.export_btn.isEnabled():
+            return
         menu = QMenu(self)
         section = self.current_section()
         for format_name, suffix in [('Word document', 'docx'), ('PDF', 'pdf'), ('Text file', 'txt')]:
@@ -1118,7 +1175,8 @@ class MainWindow(QMainWindow):
     def export(self, extension, section):
         if not self.session_id:
             return
-        self.persist()
+        if not self.persist():
+            return
         session = self.store.get(self.session_id)
         name = safe_filename(session['title'])
         suffix = safe_filename(section).replace(' ', '-')
@@ -1157,7 +1215,7 @@ class MainWindow(QMainWindow):
         self.audio_length.setText(stamp(ms / 1000))
 
     def _playback_changed(self, state):
-        self.play_btn.setText('Ⅱ  Pause' if state == QMediaPlayer.PlayingState else '▶  Play')
+        self.play_btn.setText('Pause' if state == QMediaPlayer.PlayingState else 'Play')
 
     def dragEnterEvent(self, event):
         files = event.mimeData().urls() if event.mimeData().hasUrls() else []
@@ -1187,5 +1245,10 @@ class MainWindow(QMainWindow):
                                    'Audio transcription or report generation is still running. Close the app after it completes.')
             event.ignore()
             return
-        self.persist()
+        if not self.persist():
+            self._show_error('Your changes are not saved yet',
+                             'Please check available disk space and try again. Keep this window open to protect your edits.',
+                             self._save_error)
+            event.ignore()
+            return
         event.accept()
