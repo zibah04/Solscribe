@@ -27,13 +27,13 @@ class TranscriptionWorker(QThread):
         try:
             if not Path(self.audio_path).is_file():
                 raise FileNotFoundError('Audio file is missing. Please import it again.')
-            self.status.emit(f'Loading {self.model_name} speech model (first run requires internet)…')
+            self.status.emit('Getting ready to read your recording · first use needs a download…')
             from faster_whisper import WhisperModel
             model = WhisperModel(self.model_name, device='cpu', compute_type='int8',
                                  download_root=self.models_folder, cpu_threads=4)
             if self._cancel.is_set():
                 return
-            self.status.emit('Transcribing audio…')
+            self.status.emit('Turning your recording into text…')
             iterator, info = model.transcribe(self.audio_path, language=self.language,
                                               beam_size=5, vad_filter=True,
                                               condition_on_previous_text=False)

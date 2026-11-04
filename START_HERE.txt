@@ -6,15 +6,15 @@ QUICK START (Windows 10 / 11)
 1. Extract the SolScribe ZIP.
 2. Install Python 3.11 (64-bit) from python.org if you do not already have it.
 3. Double-click run_windows.bat. It installs packages and opens the desktop app.
-4. LIVE: Choose a microphone, keep the Live transcription checkbox checked,
-   then click "Record + live captions". Spoken words appear in ~2-second batches plus processing time.
+4. LIVE: Choose a microphone, keep the Show words while I speak checkbox checked,
+   then click "Record meeting". Spoken words appear in ~2-second batches plus processing time.
    The first live model download can take longer; watch the caption status.
    "Example meeting" is saved sample text, not microphone listening.
-5. STOP: Click "Stop recording". Use "Transcribe" to polish the final transcript
+5. STOP: Click "Stop recording". Use "Improve transcript" for a more accurate version
    from the complete saved audio (optional, recommended for formal records).
-6. VOICE MEMO: Import an existing WAV, MP3, M4A, MP4 etc. and click "Transcribe".
+6. VOICE MEMO: Import an existing WAV, MP3, M4A, MP4 etc. and click "Create transcript".
 7. NOTES: Select "Paste spoken notes" to turn existing text into documents.
-8. Click "Generate documents". Review the four document tabs.
+8. Click "Create notes". Review the four document tabs.
 9. Export PDF, Word DOCX, Markdown, text, SRT subtitles or full project JSON.
 
 To build a portable Windows app without opening Python manually:
@@ -28,7 +28,7 @@ To build a Windows .exe setup automatically through GitHub Actions:
 
 IMPORTANT
 - The first model download needs internet; thereafter transcription is local.
-- Live captions arrive in CHUNKS, with extra CPU processing delay.
+- Live captions arrive in short batches, with a little processing time.
 - For 8 GB RAM, use 'tiny' for speed or 'base' for a balance of accuracy/speed.
 - Recordings, transcripts, and summaries remain on the PC by default.
 - Full local AI context summaries are optional via Ollama (ollama.com).

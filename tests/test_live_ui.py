@@ -62,7 +62,7 @@ def test_transcript_has_visible_rows_at_laptop_sizes(window, app, size):
     assert window.table.viewport().height() >= 160
     assert not window.table.isRowHidden(0)
     assert window.table.rowHeight(0) >= 48
-    for control in (window.live_model_combo, window.transcribe_btn, window.play_btn):
+    for control in (window.transcribe_btn, window.play_btn):
         assert control.height() >= control.minimumSizeHint().height()
 
 
@@ -139,8 +139,9 @@ def test_caption_failure_remains_visible_during_recording(window, monkeypatch):
     window.toggle_record()
     until(lambda: window._live_failed_message is not None)
     window._refresh_recording()
-    assert 'Model download failed' in window.caption_status.text()
-    assert 'CAPTIONS UNAVAILABLE' in window.status_label.text()
+    assert 'recording is safe' in window.caption_status.text()
+    assert 'Model download failed' not in window.caption_status.text()
+    assert 'WORDS UNAVAILABLE' in window.status_label.text()
     assert window.record_timer.isActive()
 
 
@@ -152,3 +153,92 @@ def test_meeting_details_export_shortcut_and_metadata(window):
     assert window.store.get(window.session_id)['attendees'] == 'Alice, Bob'
     window.tabs.setCurrentIndex(6)
     assert window.current_section() == 'Transcript'
+
+
+def test_missing_writing_helper_creates_notes_without_an_error_popup(window, monkeypatch):
+    from urllib.error import URLError
+    def unavailable(*args):
+        raise URLError('[WinError 10061] Connection refused')
+    monkeypatch.setattr(ui, 'draft_ai', unavailable)
+    monkeypatch.setattr(window, '_show_error', lambda *args: pytest.fail('Unexpected error popup'))
+    window.load_demo()
+    sid = window.session_id
+    window.engine_combo.setCurrentIndex(window.engine_combo.findData('ai'))
+    window.generate_reports()
+    until(lambda: not window._is_busy() and bool(window.store.get(sid)['summary']))
+    until(lambda: window.notes_details_btn.isVisible())
+    saved = window.store.get(sid)
+    assert all(saved[field] for field in ('summary', 'minutes', 'memo', 'actions'))
+    assert 'landing page' in saved['summary']
+    assert 'Quick notes are ready' in window.flow_hint.text()
+    assert 'WinError' not in window.flow_hint.text()
+    assert 'WinError' in window._notes_details
+    assert not window.doc_edits['Summary'].isReadOnly()
+    assert window.report_btn.isEnabled()
+
+
+def test_declining_replacement_preserves_edited_notes(window, monkeypatch):
+    window.load_demo()
+    window.doc_edits['Summary'].setPlainText('My carefully edited notes')
+    monkeypatch.setattr(ui.QMessageBox, 'question', lambda *args: ui.QMessageBox.No)
+    window.generate_reports()
+    assert window._report_worker is None
+    assert window.store.get(window.session_id)['summary'] == 'My carefully edited notes'
+
+
+def test_save_a_copy_does_not_interrupt_with_an_extra_dialog(window, monkeypatch, tmp_path):
+    window.load_demo()
+    dest = tmp_path / 'meeting.docx'
+    monkeypatch.setattr(ui.QFileDialog, 'getSaveFileName', lambda *args: (str(dest), ''))
+    monkeypatch.setattr(ui.QMessageBox, 'question', lambda *args: pytest.fail('Unexpected save confirmation'))
+    window.export('docx', 'Transcript')
+    assert dest.stat().st_size > 500
+    assert 'Saved meeting.docx' in window.status_label.text()
+
+
+@pytest.mark.parametrize('error', [ConnectionRefusedError('refused'), TimeoutError('timed out'), ValueError('invalid response')])
+def test_report_worker_uses_quick_notes_if_optional_writer_fails(app, monkeypatch, error):
+    def broken(*args):
+        raise error
+    monkeypatch.setattr(ui, 'draft_ai', broken)
+    session = {'title': 'Planning', 'segments': [{'start': 0, 'end': 3, 'speaker': 'Speaker', 'text': 'We agreed to launch on Friday.'}]}
+    worker = ui.ReportWorker(session, 'ai', 'llama3.2')
+    results, failures = [], []
+    worker.done.connect(results.append)
+    worker.failed.connect(failures.append)
+    worker.run()
+    assert not failures
+    assert len(results) == 1 and results[0]['fallback']
+    assert 'launch on Friday' in results[0]['minutes']
+    assert 'summary' not in session  # Drafting does not mutate the original session.
+
+
+def test_polished_notes_are_used_when_the_writer_works(app, monkeypatch):
+    expected = {field: f'Polished {field}' for field in ('summary', 'minutes', 'memo', 'actions')}
+    monkeypatch.setattr(ui, 'draft_ai', lambda *args: expected.copy())
+    worker = ui.ReportWorker({'title': 'Meeting'}, 'ai', 'llama3.2')
+    results = []
+    worker.done.connect(results.append)
+    worker.run()
+    assert results == [expected]
+
+
+def test_formatted_notes_round_trip_and_export_without_visible_markup(window, tmp_path):
+    from docx import Document
+    from solscribe.exporters import export_file
+    editor = window.doc_edits['Minutes']
+    editor.setMarkdown('# Meeting notes\n\n## Decisions\n\n- **Launch approved**')
+    assert '# Meeting' not in editor.toPlainText()
+    assert '**' not in editor.toPlainText()
+    sid = window.session_id
+    window.persist()
+    window.load_session(sid)
+    assert 'Launch approved' in window.doc_edits['Minutes'].toPlainText()
+    session = window.store.get(sid)
+    assert '# Meeting notes' in session['minutes']
+    path = tmp_path / 'notes.docx'
+    export_file(path, 'docx', session, 'Minutes')
+    paragraphs = [p.text for p in Document(path).paragraphs]
+    assert 'Meeting notes' in paragraphs
+    assert 'Decisions' in paragraphs
+    assert 'Launch approved' in paragraphs

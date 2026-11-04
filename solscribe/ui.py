@@ -5,6 +5,7 @@ import copy
 import os
 import queue
 import uuid
+from urllib.error import URLError
 from datetime import datetime
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLineEdit, QPushButton, QLabel, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView,
+    QPlainTextEdit, QTextEdit, QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView,
     QComboBox, QFileDialog, QMessageBox, QProgressBar, QSlider, QMenu, QCheckBox,
     QToolButton, QAbstractItemView, QInputDialog, QApplication, QSizePolicy, QScrollArea,
 )
@@ -43,7 +44,7 @@ QLabel#Headline { color: white; font-size: 17pt; font-weight: 700; }
 QFrame#Panel { background: #141E32; border: 1px solid #27334D; border-radius: 15px; }
 QFrame#SettingPanel { background: #111A2C; border: 1px solid #25304B; border-radius: 11px; }
 QLabel#SettingLabel { color: #9EACC5; font-size: 9pt; }
-QLineEdit, QPlainTextEdit, QComboBox { background: #0C1526; border: 1px solid #2B3856; border-radius: 8px; padding: 6px; color: #F0F2F8; selection-background-color: #7167DE; }
+QLineEdit, QPlainTextEdit, QTextEdit, QComboBox { background: #0C1526; border: 1px solid #2B3856; border-radius: 8px; padding: 6px; color: #F0F2F8; selection-background-color: #7167DE; }
 QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border: 1px solid #8A7DF8; }
 QLineEdit#TitleInput { background: transparent; border: none; padding: 0px; font-size: 19pt; font-weight: 700; color: white; }
 QLineEdit#TitleInput:focus { border: none; }
@@ -55,6 +56,7 @@ QPushButton:pressed { background: #263551; }
 QPushButton:disabled { background: #1B2436; color: #63718B; border-color: #253048; }
 QPushButton#Primary { background: #7467E8; border-color: #7467E8; color: white; }
 QPushButton#Primary:hover { background: #8C81F5; }
+QPushButton#Primary:disabled { background: #1B2436; color: #63718B; border-color: #253048; }
 QCheckBox { color: #C7C2FF; font-size: 9pt; spacing: 8px; }
 QCheckBox::indicator { width: 17px; height: 17px; }
 QPushButton#Record { background: #3B2539; border-color: #75415A; color: #FFB5CC; }
@@ -105,10 +107,16 @@ class ReportWorker(QThread):
     def run(self):
         try:
             if self.method == 'ai':
-                self.status.emit(f'Preparing documents with local Ollama ({self.model})…')
-                output = draft_ai(self.session, self.model)
+                self.status.emit('Writing your meeting notes…')
+                try:
+                    output = draft_ai(self.session, self.model)
+                except (OSError, ValueError, URLError) as exc:
+                    self.status.emit('Making quick notes from your transcript instead…')
+                    output = draft_local(self.session)
+                    output['fallback'] = True
+                    output['details'] = f'{type(exc).__name__}: {exc}'
             else:
-                self.status.emit('Preparing evidence-linked local drafts…')
+                self.status.emit('Creating notes from your transcript…')
                 output = draft_local(self.session)
             self.done.emit(output)
         except Exception as exc:
@@ -130,8 +138,11 @@ class MainWindow(QMainWindow):
         self._live_worker = None
         self._live_session_id = None
         self._live_failed_message = None
+        self._notes_session_id = None
+        self._notes_notice = ''
+        self._notes_details = ''
         self.recorder = MicrophoneRecorder()
-        self.setWindowTitle('SolScribe 0.2.1 · Meeting Intelligence Studio')
+        self.setWindowTitle('SolScribe 0.2.2 · Meeting notes')
         self.setMinimumSize(1000, 640)
         self.resize(1400, 830)
         self.setStyleSheet(STYLE)
@@ -206,13 +217,13 @@ class MainWindow(QMainWindow):
         self.new_btn = self._button('＋  New session', 'Primary')
         self.new_btn.clicked.connect(self.new_session)
         sidebar.addWidget(self.new_btn)
-        self.import_btn = self._button('↥  Import audio / video', 'Plain')
+        self.import_btn = self._button('↥  Add a recording', 'Plain')
         self.import_btn.clicked.connect(self.import_audio)
         sidebar.addWidget(self.import_btn)
-        self.record_btn = self._button('●  Record + live captions', 'Record')
+        self.record_btn = self._button('●  Record meeting', 'Record')
         self.record_btn.clicked.connect(self.toggle_record)
         sidebar.addWidget(self.record_btn)
-        self.paste_btn = self._button('≡  Paste spoken notes', 'Plain')
+        self.paste_btn = self._button('≡  Paste text', 'Plain')
         self.paste_btn.clicked.connect(self.paste_text)
         sidebar.addWidget(self.paste_btn)
         sidebar.addSpacing(8)
@@ -253,7 +264,7 @@ class MainWindow(QMainWindow):
         self.delete_btn = self._button('Delete', 'Plain')
         self.delete_btn.clicked.connect(self.delete_session)
         header.addWidget(self.delete_btn)
-        self.export_btn = self._button('↓  Export', 'Plain')
+        self.export_btn = self._button('↓  Save a copy', 'Plain')
         self.export_btn.clicked.connect(self.show_export_menu)
         header.addWidget(self.export_btn)
         work.addLayout(header)
@@ -266,7 +277,7 @@ class MainWindow(QMainWindow):
         audio_row = QHBoxLayout()
         left_audio = QVBoxLayout()
         left_audio.setSpacing(4)
-        self.audio_name = QLabel('No audio linked · import a file or record to begin')
+        self.audio_name = QLabel('No recording yet · record a meeting or add a file')
         self.audio_name.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.audio_name.setMinimumWidth(0)
         left_audio.addWidget(self.audio_name)
@@ -275,7 +286,9 @@ class MainWindow(QMainWindow):
         self.play_btn.clicked.connect(self.toggle_play)
         audio_row.addWidget(self.play_btn)
         a_layout.addLayout(audio_row)
-        playback = QHBoxLayout()
+        self.playback_controls = QWidget()
+        playback = QHBoxLayout(self.playback_controls)
+        playback.setContentsMargins(0, 0, 0, 0)
         playback.setSpacing(10)
         self.audio_position = self._label('00:00', 'Muted')
         playback.addWidget(self.audio_position)
@@ -285,16 +298,18 @@ class MainWindow(QMainWindow):
         playback.addWidget(self.seek, 1)
         self.audio_length = self._label('00:00', 'Muted')
         playback.addWidget(self.audio_length)
-        a_layout.addLayout(playback)
+        a_layout.addWidget(self.playback_controls)
 
         controls = QHBoxLayout()
         controls.setSpacing(8)
-        controls.addWidget(self._label('Final model', 'SettingLabel'))
+        controls.addWidget(self._label('Recording quality', 'SettingLabel'))
         self.model_combo = QComboBox()
-        self.model_combo.addItems(['base', 'small', 'tiny', 'medium', 'large-v3'])
-        self.model_combo.setToolTip('Smaller Whisper models are faster on CPU; larger models need more RAM.')
-        self.model_combo.setCurrentText(str(self.settings.value('whisper_model', 'base')))
-        self.model_combo.currentTextChanged.connect(lambda v: self.settings.setValue('whisper_model', v))
+        for label, model in [('Balanced', 'base'), ('More accurate', 'small'), ('Fastest', 'tiny'),
+                             ('High accuracy · slower', 'medium'), ('Highest accuracy · slowest', 'large-v3')]:
+            self.model_combo.addItem(label, model)
+        self.model_combo.setToolTip('Choose faster results or greater accuracy when creating a transcript from a recording.')
+        self.model_combo.setCurrentIndex(max(0, self.model_combo.findData(str(self.settings.value('whisper_model', 'base')))))
+        self.model_combo.currentIndexChanged.connect(lambda _: self.settings.setValue('whisper_model', self.model_combo.currentData()))
         controls.addWidget(self.model_combo)
         controls.addWidget(self._label('Language', 'SettingLabel'))
         self.language_combo = QComboBox()
@@ -310,23 +325,26 @@ class MainWindow(QMainWindow):
             lambda _: self.settings.setValue('language', self.language_combo.currentData()))
         controls.addWidget(self.language_combo)
         controls.addStretch(1)
-        self.transcribe_btn = self._button('✦  Transcribe', 'Primary')
+        self.transcribe_btn = self._button('✦  Create transcript', 'Primary')
         self.transcribe_btn.clicked.connect(self.transcribe)
         audio_row.addWidget(self.transcribe_btn)
         live_row = QHBoxLayout()
-        self.live_checkbox = QCheckBox('Live transcription during recording')
+        self.live_checkbox = QCheckBox('Show words while I speak')
         self.live_checkbox.setChecked(self.settings.value('live_captions', True, type=bool))
-        self.live_checkbox.setToolTip('Shows caption segments during recording. A full transcription afterward is more accurate.')
+        self.live_checkbox.setToolTip('Your words appear below after a short pause. You can improve the transcript after recording.')
         self.live_checkbox.toggled.connect(self._live_option_changed)
         live_row.addWidget(self.live_checkbox)
         live_row.addStretch(1)
-        live_row.addWidget(self._label('Live model', 'SettingLabel'))
+        live_controls = QHBoxLayout()
+        live_controls.addWidget(self._label('While recording', 'SettingLabel'))
         self.live_model_combo = QComboBox()
-        self.live_model_combo.addItems(['tiny', 'base', 'small'])
-        self.live_model_combo.setCurrentText(str(self.settings.value('live_model', 'tiny')))
-        self.live_model_combo.setToolTip('Tiny is fastest for live captions. Final model is used after recording.')
-        self.live_model_combo.currentTextChanged.connect(lambda v: self.settings.setValue('live_model', v))
-        live_row.addWidget(self.live_model_combo)
+        for label, model in [('Fast captions', 'tiny'), ('Balanced captions', 'base'), ('More accurate · slower', 'small')]:
+            self.live_model_combo.addItem(label, model)
+        self.live_model_combo.setCurrentIndex(max(0, self.live_model_combo.findData(str(self.settings.value('live_model', 'tiny')))))
+        self.live_model_combo.setToolTip('Fast captions are recommended so your words appear sooner.')
+        self.live_model_combo.currentIndexChanged.connect(lambda _: self.settings.setValue('live_model', self.live_model_combo.currentData()))
+        live_controls.addWidget(self.live_model_combo)
+        live_controls.addStretch(1)
         a_layout.addLayout(live_row)
         self.progress = QProgressBar()
         self.progress.setTextVisible(False)
@@ -364,26 +382,33 @@ class MainWindow(QMainWindow):
         self.agenda_edit.textChanged.connect(self.schedule_save)
 
         report_row = QHBoxLayout()
+        self.flow_hint = self._label('Record a meeting or add a recording to begin.', 'Hint')
+        self.flow_hint.setWordWrap(True)
+        report_row.addWidget(self.flow_hint, 1)
+        writing_controls = QHBoxLayout()
+        writing_controls.addWidget(self._label('Note style', 'SettingLabel'))
         self.engine_combo = QComboBox()
-        self.engine_combo.addItem('Instant draft · offline', 'local')
-        self.engine_combo.addItem('Ollama · local AI', 'ai')
+        self.engine_combo.addItem('Quick notes · ready to use', 'local')
+        self.engine_combo.addItem('Polished notes · optional helper', 'ai')
         self.engine_combo.setCurrentIndex(0 if self.settings.value('engine', 'local') == 'local' else 1)
         self.engine_combo.currentIndexChanged.connect(
             lambda _: self.settings.setValue('engine', self.engine_combo.currentData()))
-        report_row.addWidget(self.engine_combo)
+        writing_controls.addWidget(self.engine_combo)
+        writing_controls.addStretch(1)
         self.ollama_model = QLineEdit(str(self.settings.value('ollama_model', 'llama3.2')))
         self.ollama_model.setFixedWidth(125)
         self.ollama_model.setToolTip('Ollama local model name. Example: llama3.2')
         self.ollama_model.textChanged.connect(lambda v: self.settings.setValue('ollama_model', v))
-        report_row.addWidget(self.ollama_model)
-        report_row.addStretch(1)
-        self.report_btn = self._button('✧  Generate documents', 'Primary')
-        self.report_btn.setToolTip('Generate summary, minutes, memo and action items from the transcript.')
+        self.notes_details_btn = self._button('Why quick notes?', 'Plain')
+        self.notes_details_btn.clicked.connect(self._show_note_details)
+        self.notes_details_btn.hide()
+        report_row.addWidget(self.notes_details_btn)
+        self.report_btn = self._button('✧  Create notes', 'Primary')
+        self.report_btn.setToolTip('Create a summary, minutes, memo and action list. You can edit everything afterward.')
         self.report_btn.clicked.connect(self.generate_reports)
         report_row.addWidget(self.report_btn)
         work.addLayout(report_row)
         self.engine_combo.currentIndexChanged.connect(self._engine_changed)
-        self._engine_changed()
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
@@ -394,7 +419,7 @@ class MainWindow(QMainWindow):
         t_layout.setContentsMargins(10, 10, 10, 10)
         t_layout.setSpacing(10)
         transcript_head = QHBoxLayout()
-        self.caption_status = self._label('Ready · choose a microphone, then Record + live captions', 'Hint')
+        self.caption_status = self._label('Ready · choose a microphone, then click Record meeting', 'Hint')
         self.caption_status.setWordWrap(True)
         self.caption_status.setMinimumHeight(32)
         transcript_head.addWidget(self.caption_status, 1)
@@ -431,10 +456,11 @@ class MainWindow(QMainWindow):
             layout = QVBoxLayout(page)
             layout.setContentsMargins(10, 10, 10, 10)
             layout.setSpacing(9)
-            layout.addWidget(self._label('Editable document · generated content is a draft. Verify before sharing.', 'Hint'))
-            text = QPlainTextEdit()
-            text.setPlaceholderText('Generate a document or start writing here…')
-            text.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+            layout.addWidget(self._label('Make this your own · edit anything, then save a copy when ready.', 'Hint'))
+            text = QTextEdit()
+            text.setAcceptRichText(False)
+            text.setPlaceholderText('Click Create notes, or start writing here…')
+            text.setLineWrapMode(QTextEdit.WidgetWidth)
             text.textChanged.connect(self.schedule_save)
             layout.addWidget(text, 1)
             self.doc_edits[name] = text
@@ -449,12 +475,41 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(details_page, 'Meeting details')
         settings_page = QWidget()
         settings_layout = QVBoxLayout(settings_page)
-        settings_hint = self._label('Final transcription · used by Transcribe after recording. Live captions use the live model above.', 'Hint')
+        settings_hint = self._label('Choose how SolScribe turns speech into text. The defaults work well for most meetings.', 'Hint')
         settings_hint.setWordWrap(True)
         settings_layout.addWidget(settings_hint)
         settings_layout.addLayout(controls)
+        settings_layout.addLayout(live_controls)
+        settings_layout.addLayout(writing_controls)
+        helper_hint = self._label('Quick notes work straight away. Polished notes use an optional writing helper on this PC. If it is unavailable, you still get quick notes.', 'Hint')
+        helper_hint.setWordWrap(True)
+        settings_layout.addWidget(helper_hint)
+        advanced_toggle = QToolButton()
+        advanced_toggle.setText('Advanced writing setup')
+        advanced_toggle.setCheckable(True)
+        advanced_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        advanced_toggle.setArrowType(Qt.RightArrow)
+        settings_layout.addWidget(advanced_toggle)
+        advanced = QWidget()
+        advanced_layout = QVBoxLayout(advanced)
+        advanced_layout.setContentsMargins(0, 4, 0, 0)
+        advanced_hint = self._label('Polished notes use Ollama, a separate app that runs on your PC. Install it and add a writing model, then enter its name below.', 'Hint')
+        advanced_hint.setWordWrap(True)
+        advanced_layout.addWidget(advanced_hint)
+        advanced_layout.addWidget(self.ollama_model)
+        setup_link = self._label('<a href="https://github.com/zibah04/Solscribe/blob/codex/windows-build-v0.2/README.md#optional-better-local-ai-minutes">Open the writing helper setup guide</a>', 'Hint')
+        setup_link.setOpenExternalLinks(True)
+        advanced_layout.addWidget(setup_link)
+        advanced.hide()
+        advanced_toggle.toggled.connect(advanced.setVisible)
+        advanced_toggle.toggled.connect(lambda checked: advanced_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow))
+        settings_layout.addWidget(advanced)
+        self._engine_changed()
         settings_layout.addStretch(1)
-        self.tabs.addTab(settings_page, 'Settings')
+        settings_scroll = QScrollArea()
+        settings_scroll.setWidgetResizable(True)
+        settings_scroll.setWidget(settings_page)
+        self.tabs.addTab(settings_scroll, 'Settings')
         work.addWidget(self.tabs, 1)
 
         bottom = QHBoxLayout()
@@ -471,7 +526,22 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
 
     def _engine_changed(self, *args):
-        self.ollama_model.setVisible(self.engine_combo.currentData() == 'ai')
+        self.ollama_model.setEnabled(self.engine_combo.currentData() == 'ai')
+
+    def _show_error(self, title, message, details):
+        dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Warning)
+        dialog.setWindowTitle(title)
+        dialog.setText(message)
+        dialog.setDetailedText(str(details))
+        dialog.exec()
+
+    def _show_note_details(self):
+        self._show_error('About these notes',
+                         'Your quick notes are ready to edit and save.\n\n'
+                         'The optional writing helper was unavailable, so these notes use phrases from your transcript. '
+                         'You can set up the helper in Settings → Advanced writing setup, or keep using quick notes.',
+                         self._notes_details)
 
     def _bind_shortcuts(self):
         for shortcut, fn in [('Ctrl+N', self.new_session), ('Ctrl+O', self.import_audio),
@@ -509,10 +579,10 @@ class MainWindow(QMainWindow):
         for index, item in enumerate(self.store.list(query)):
             label = item['title'] or 'Untitled meeting'
             if item['segments']:
-                label += f'  ·  {len(item["segments"])} parts'
+                label += '  ·  transcript'
             row = QListWidgetItem(label)
             row.setData(Qt.UserRole, item['id'])
-            row.setToolTip(item['created_at'] + '\n' + (item['audio_path'] or 'Text-only session'))
+            row.setToolTip(item['title'] + '\n' + item['created_at'] + '\n' + (item['audio_path'] or 'Written notes'))
             self.library.addItem(row)
             if item['id'] == selected:
                 chosen_row = index
@@ -558,24 +628,25 @@ class MainWindow(QMainWindow):
             self.table.setItem(idx, 2, QTableWidgetItem(segment.get('text') or ''))
         self.table.blockSignals(False)
         self.search_transcript.clear()
-        self.caption_status.setText('Saved transcript · click Record + live captions to start a new capture')
+        self.caption_status.setText('Your words are saved · record another meeting or create notes')
         for name, field in [('Summary', 'summary'), ('Minutes', 'minutes'), ('Memo', 'memo'), ('Action items', 'actions')]:
-            self.doc_edits[name].setPlainText(session.get(field) or '')
+            self.doc_edits[name].setMarkdown(session.get(field) or '')
         path = session.get('audio_path')
+        self.playback_controls.setVisible(bool(path and Path(path).is_file()))
         if path and Path(path).is_file():
             self.audio_name.setText(Path(path).name)
             self.audio_name.setToolTip(str(path))
             self.player.setSource(QUrl.fromLocalFile(str(Path(path).resolve())))
             self.play_btn.setEnabled(True)
         else:
-            self.audio_name.setText('Source audio not found' if path else 'Text-only session · no audio attached')
+            self.audio_name.setText('Recording not found' if path else 'Written notes · no recording attached')
             self.audio_name.setToolTip(str(path or ''))
             self.player.setSource(QUrl())
             self.play_btn.setEnabled(False)
         self.audio_length.setText(stamp(session.get('duration') or 0))
         self._loading = False
         self.update_actions()
-        self.status_label.setText(f'{len(session["segments"])} transcript segments  ·  Local project')
+        self.status_label.setText('Saved on this PC · changes save automatically')
 
     def update_actions(self):
         has_audio = bool(self.current_session and self.current_session.get('audio_path') and
@@ -585,12 +656,34 @@ class MainWindow(QMainWindow):
         reporting = bool(self._report_worker and self._report_worker.isRunning())
         recording = self.record_timer.isActive()
         busy = transcribing or reporting or live_working
+        has_words = bool(self.current_session and self.current_session.get('segments'))
         for control in (self.mic_combo, self.live_checkbox, self.live_model_combo, self.language_combo):
             control.setEnabled(not recording and not live_working)
         self.transcribe_btn.setEnabled((has_audio and not reporting and not recording and not live_working) or transcribing)
         if not transcribing:
-            self.transcribe_btn.setText('✦  Transcribe')
-        self.report_btn.setEnabled(bool(self.current_session) and not busy and not recording)
+            self.transcribe_btn.setText('✦  Improve transcript' if has_words and has_audio else '✦  Create transcript')
+        self.report_btn.setEnabled(has_words and not busy and not recording)
+        for edit in self.doc_edits.values():
+            edit.setReadOnly(reporting)
+        has_notice = self.session_id == self._notes_session_id and bool(self._notes_notice)
+        self.notes_details_btn.setVisible(has_notice and not busy and not recording)
+        if recording:
+            hint = 'Your recording is being saved. Your words appear below.' if self.live_checkbox.isChecked() else 'Your recording is being saved. Click Stop recording when finished.'
+        elif transcribing:
+            hint = 'Turning your recording into text…'
+        elif reporting:
+            hint = 'Creating your notes… you can edit them when they are ready.'
+        elif live_working:
+            hint = 'Finishing the last words from your recording…'
+        elif has_notice:
+            hint = self._notes_notice
+        elif has_words:
+            hint = 'Your transcript is ready. Create notes or save a copy.'
+        elif has_audio:
+            hint = 'Next: click Create transcript to see the words in your recording.'
+        else:
+            hint = 'Record a meeting or add a recording to begin.'
+        self.flow_hint.setText(hint)
         self.delete_btn.setEnabled(not busy and not recording)
         for control in (self.new_btn, self.import_btn, self.paste_btn, self.demo_btn,
                         self.library, self.search_library):
@@ -624,8 +717,8 @@ class MainWindow(QMainWindow):
         session_id = self.store.demo()
         self.search_library.clear()
         self.reload_library(select_id=session_id)
-        self.caption_status.setText('Example meeting · saved sample text. To see your own words, click Record + live captions.')
-        self.statusBar().showMessage('Example meeting loaded. Try Generate minutes + memo.', 8000)
+        self.caption_status.setText('Example meeting · sample text. Click Record meeting to capture your own words.')
+        self.statusBar().showMessage('Example meeting loaded. Try Create notes.', 8000)
 
     def import_audio(self, path=None):
         if self._is_busy():
@@ -647,7 +740,7 @@ class MainWindow(QMainWindow):
         self.search_library.clear()
         self.reload_library(select_id=session_id)
         self.status_label.setText('Ready to transcribe. Files stay in their original location.')
-        self.statusBar().showMessage('Audio imported. Select an accuracy model and click Transcribe.', 9000)
+        self.statusBar().showMessage('Recording added. Click Create transcript to see the words.', 9000)
 
     def paste_text(self):
         if self._is_busy():
@@ -669,7 +762,7 @@ class MainWindow(QMainWindow):
     def _live_option_changed(self, enabled):
         self.settings.setValue('live_captions', enabled)
         if not self.record_timer.isActive():
-            self.record_btn.setText('●  Record + live captions' if enabled else '●  Start recording')
+            self.record_btn.setText('●  Record meeting')
 
     def toggle_record(self):
         if self.record_timer.isActive():
@@ -677,7 +770,7 @@ class MainWindow(QMainWindow):
                 self.persist()
                 path = self.recorder.stop()
                 self.record_timer.stop()
-                self.record_btn.setText('●  Record + live captions' if self.live_checkbox.isChecked() else '●  Start recording')
+                self.record_btn.setText('●  Record meeting')
                 self.record_btn.setObjectName('Record')
                 self.record_btn.style().unpolish(self.record_btn)
                 self.record_btn.style().polish(self.record_btn)
@@ -687,19 +780,20 @@ class MainWindow(QMainWindow):
                     self.load_session(self.session_id)
                 if self._live_worker and self._live_worker.isRunning():
                     self._live_worker.stop()
-                    self.status_label.setText('Recording saved · finalizing live captions…')
-                    self.caption_status.setText('Recording saved · finishing queued captions; keep this window open…')
+                    self.status_label.setText('Recording saved · finishing the last words…')
+                    self.caption_status.setText('Recording saved · finishing the last words…')
                 else:
                     self.status_label.setText(f'Recording saved · {stamp(self.recorder.elapsed)} · Ready to transcribe')
                 if self.recorder.live_dropped:
-                    QMessageBox.warning(self, 'Live captions fell behind',
-                        'Some audio was omitted from the LIVE captions because the CPU could not keep up. '
-                        'Your original WAV is safe. Use Transcribe to produce the full final transcript.')
+                    QMessageBox.warning(self, 'Some words could not keep up',
+                        'Your full recording is safe. Choose Improve transcript to fill in any words that were missed while recording.')
                 if self.recorder.error or self.recorder.elapsed < 0.2:
-                    QMessageBox.warning(self, 'Recording warning', self.recorder.error or
-                                        'The recording contains almost no audio. Check the selected input device.')
+                    self._show_error('Check your recording',
+                                     'Some sound may be missing. Play the recording to check it, and make sure the right microphone is selected.',
+                                     self.recorder.error or 'There is almost no sound in this recording.')
             except Exception as exc:
-                QMessageBox.critical(self, 'Recording error', str(exc))
+                self._show_error('Could not finish recording',
+                                 'Please check your saved recording before starting another meeting.', exc)
             finally:
                 self.update_actions()
             return
@@ -731,11 +825,13 @@ class MainWindow(QMainWindow):
             self.store.update(self.session_id, audio_path=str(path), duration=0,
                               model='live' if live_enabled else '')
             self.current_session = self.store.get(self.session_id)
+            self.audio_name.setText('Recording this meeting…')
+            self.playback_controls.hide()
             if live_enabled:
-                model = self.live_model_combo.currentText()
+                model = self.live_model_combo.currentData()
                 self._live_session_id = self.session_id
                 self._live_failed_message = None
-                self.caption_status.setText(f'Loading live model ({model}) · first use needs internet; recording is safe')
+                self.caption_status.setText('Getting ready to listen · first use needs a download. Your recording is safe.')
                 self.search_transcript.clear()
                 self._live_worker = LiveTranscriptionWorker(
                     live_queue, model, self.language_combo.currentData(), self.store.models, self)
@@ -751,15 +847,15 @@ class MainWindow(QMainWindow):
             self.record_btn.setObjectName('Recording')
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)
-            self.status_label.setText('Recording and preparing live captions…' if live_enabled
-                                      else 'Recording selected audio source…')
+            self.status_label.setText('Recording · getting ready to show your words…' if live_enabled
+                                      else 'Recording…')
             self.record_timer.start()
             self.update_actions()
         except Exception as exc:
             if self.recorder.active:
                 self.recorder.stop()
-            QMessageBox.critical(self, 'Cannot open audio source',
-                f'{exc}\n\nCheck Windows Settings → Privacy & security → Microphone, and verify that the device is available.')
+            self._show_error('Microphone unavailable',
+                'We could not start recording. Choose another microphone below, or allow microphone access in Windows Settings.', exc)
 
     def _refresh_recording(self):
         duration = stamp(self.recorder.elapsed)
@@ -769,10 +865,10 @@ class MainWindow(QMainWindow):
             behind = max(0, int(self.recorder.elapsed - self._live_worker.processed_seconds))
             caption += f' · ~{behind}s pending' if behind >= 10 else ''
         if self._live_failed_message:
-            caption = ' · CAPTIONS UNAVAILABLE · audio is still recording'
+            caption = ' · WORDS UNAVAILABLE · recording continues'
         elif self.recorder.elapsed >= 3 and self.recorder.level < 0.0001:
-            caption += ' · No input level · check the selected microphone'
-        self.status_label.setText(f'● REC {duration}{caption}    {"▮" * bars}{"▯" * (12 - bars)}')
+            caption += ' · No sound detected · check your microphone'
+        self.status_label.setText(f'● Recording {duration}{caption}    {"▮" * bars}{"▯" * (12 - bars)}')
         if not self.recorder.active:
             # An audio backend may fail asynchronously (e.g., unplugged loopback).
             self.toggle_record()
@@ -806,19 +902,16 @@ class MainWindow(QMainWindow):
 
     def _live_failed(self, message):
         self._live_failed_message = message
-        self.caption_status.setText('Live captions unavailable · ' + message)
-        self.status_label.setText('Live captions unavailable · recording preserved')
-        QMessageBox.warning(self, 'Live transcription stopped',
-                            f'{message}\n\nAudio recording continues safely. After stopping, '
-                            'use the Transcribe button for a complete transcript.')
+        self.caption_status.setText('Words cannot be shown right now. Your recording is safe; create a transcript when you finish.')
+        self.status_label.setText('Recording continues · words are temporarily unavailable')
 
     def _live_finished(self):
         if not self.record_timer.isActive():
             self.persist()
             count = self.table.rowCount()
-            message = ('Live captions incomplete · use Transcribe after recording' if self._live_failed_message
-                       else f'✓ {count} caption segments saved · use Transcribe to polish accuracy' if count
-                       else 'No words recognized · check the selected microphone, audio level and language; try Transcribe')
+            message = ('Your recording is safe. Click Create transcript to recover the words.' if self._live_failed_message
+                       else '✓ Your words are saved. Choose Improve transcript for a more accurate version.' if count
+                       else 'No words recognized. Check your microphone and language, or try Create transcript.')
             self.status_label.setText(message)
             self.caption_status.setText(message)
         self.update_actions()
@@ -841,7 +934,7 @@ class MainWindow(QMainWindow):
         self.persist()
         self._transcription_session_id = self.session_id
         self._worker = TranscriptionWorker(self.current_session['audio_path'],
-                    self.model_combo.currentText(), self.language_combo.currentData(),
+                    self.model_combo.currentData(), self.language_combo.currentData(),
                     self.store.models, self)
         self._worker.status.connect(self._work_status)
         self._worker.progress.connect(self._progress_changed)
@@ -871,15 +964,17 @@ class MainWindow(QMainWindow):
             self.load_session(target_id)
         self.reload_library(select_id=target_id)
         self.tabs.setCurrentIndex(0)
-        self.status_label.setText(f'✓ Transcription complete · {len(result["segments"])} segments · {result["language"]}')
-        self.statusBar().showMessage('Transcript saved locally. Edit labels, then generate minutes and memo.', 10000)
+        self.status_label.setText(f'✓ Your transcript is ready. Edit anything or create notes.')
+        self.statusBar().showMessage('Your words are saved on this PC. Create notes when you are ready.', 10000)
 
     def _transcription_finished(self):
         self.progress.hide()
-        self.transcribe_btn.setText('✦  Transcribe')
+        self.transcribe_btn.setText('✦  Create transcript')
         self.update_actions()
 
     def generate_reports(self):
+        if self._is_busy() or self.record_timer.isActive():
+            return
         self.persist()
         session = self.store.get(self.session_id) if self.session_id else None
         if not session:
@@ -890,12 +985,15 @@ class MainWindow(QMainWindow):
             return
         if any(session.get(k) for k in ('summary', 'minutes', 'memo', 'actions')):
             answer = QMessageBox.question(self, 'Replace current documents?',
-                'Generating new documents will overwrite the currently edited summary, minutes, memo and actions. Continue?',
+                'Create fresh notes and replace your current edits? Your transcript will be kept.',
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if answer != QMessageBox.Yes:
                 return
         method = self.engine_combo.currentData()
         model = self.ollama_model.text().strip() or 'llama3.2'
+        self._notes_notice = ''
+        self._notes_details = ''
+        self._notes_session_id = self.session_id
         self._report_session_id = self.session_id
         self._report_worker = ReportWorker(session, method, model, self)
         self._report_worker.status.connect(self._work_status)
@@ -915,22 +1013,27 @@ class MainWindow(QMainWindow):
         if self.session_id == target_id:
             self.load_session(target_id)
         self.tabs.setCurrentIndex(1)
-        self.status_label.setText(f'✓ Documents ready · {output["engine"]} · Please review')
-        self.statusBar().showMessage('Summary, minutes, memo and action register saved and ready for export.', 9000)
+        if output.get('fallback'):
+            self._notes_notice = 'Quick notes are ready. The optional writing helper is unavailable.'
+            self._notes_details = output.get('details', '')
+        else:
+            self._notes_notice = ''
+            self._notes_details = ''
+        self.status_label.setText('✓ Your notes are ready. Edit anything, then save a copy.')
+        self.statusBar().showMessage('Summary, minutes, memo and action list saved.', 9000)
+        self.update_actions()
 
     def _report_failed(self, message):
         self.progress.hide()
-        QMessageBox.warning(self, 'Document generation failed',
-                            f'{message}\n\nFor a report without Ollama, choose “Instant draft · offline”.\n'
-                            'For Ollama, install it, run `ollama pull llama3.2`, and keep Ollama running.')
-        self.status_label.setText('Document generation failed — local drafts remain available.')
+        self._show_error('Could not create notes',
+                         'Your transcript and saved notes are safe. Please try again.', message)
+        self.status_label.setText('Could not create notes. Your saved work is safe.')
 
     def _task_failed(self, message):
         self.progress.hide()
-        QMessageBox.critical(self, 'Transcription failed',
-            f'{message}\n\nCheck your connection for the first model download, available disk space, '
-            'and that the recording is playable.')
-        self.status_label.setText('Transcription failed · original audio preserved')
+        self._show_error('Could not read this recording',
+                         'Your recording is safe. Check that it plays correctly and that you are online for the first speech download, then try again.', message)
+        self.status_label.setText('Could not create a transcript. Your recording is safe.')
 
     def _segment_clicked(self, row, column):
         if column == 0 and self.table.item(row, 0):
@@ -966,14 +1069,14 @@ class MainWindow(QMainWindow):
                           location=self.location_edit.text().strip(),
                           chair=self.chair_edit.text().strip(),
                           agenda=self.agenda_edit.text().strip(),
-                          summary=self.doc_edits['Summary'].toPlainText(),
-                          minutes=self.doc_edits['Minutes'].toPlainText(),
-                          memo=self.doc_edits['Memo'].toPlainText(),
-                          actions=self.doc_edits['Action items'].toPlainText())
+                          summary=self.doc_edits['Summary'].toMarkdown().strip(),
+                          minutes=self.doc_edits['Minutes'].toMarkdown().strip(),
+                          memo=self.doc_edits['Memo'].toMarkdown().strip(),
+                          actions=self.doc_edits['Action items'].toMarkdown().strip())
         self.current_session = self.store.get(self.session_id)
         active = self.library.currentItem()
         if active and active.data(Qt.UserRole) == self.session_id:
-            active.setText(new_title + (f'  ·  {len(segments)} parts' if segments else ''))
+            active.setText(new_title + ('  ·  transcript' if segments else ''))
 
     def delete_session(self):
         if self._is_busy() or self.record_timer.isActive():
@@ -1000,14 +1103,15 @@ class MainWindow(QMainWindow):
     def show_export_menu(self):
         menu = QMenu(self)
         section = self.current_section()
-        for format_name in ('PDF', 'DOCX', 'Markdown', 'TXT'):
-            suffix = {'PDF': 'pdf', 'DOCX': 'docx', 'Markdown': 'md', 'TXT': 'txt'}[format_name]
-            action = menu.addAction(f'Export {section.lower()} as {format_name}')
+        for format_name, suffix in [('Word document', 'docx'), ('PDF', 'pdf'), ('Text file', 'txt')]:
+            action = menu.addAction(f'Save {section.lower()} as {format_name}')
             action.triggered.connect(lambda checked=False, ext=suffix, sec=section: self.export(ext, sec))
-        menu.addSeparator()
-        action = menu.addAction('Transcript as SRT subtitles')
+        more = menu.addMenu('More formats')
+        action = more.addAction('Markdown (.md)')
+        action.triggered.connect(lambda: self.export('md', section))
+        action = more.addAction('Subtitles (.srt)')
         action.triggered.connect(lambda checked=False: self.export('srt', 'Transcript'))
-        action = menu.addAction('Complete session as JSON')
+        action = more.addAction('All meeting data (.json)')
         action.triggered.connect(lambda checked=False: self.export('json', 'Transcript'))
         menu.exec(self.export_btn.mapToGlobal(self.export_btn.rect().bottomLeft()))
 
@@ -1022,20 +1126,17 @@ class MainWindow(QMainWindow):
         documents = Path.home() / 'Documents'
         if not documents.exists():
             documents = Path.home()
-        destination, _ = QFileDialog.getSaveFileName(self, 'Export document',
+        destination, _ = QFileDialog.getSaveFileName(self, 'Save a copy',
                         str(documents / filename), f'{extension.upper()} files (*.{extension})')
         if not destination:
             return
         try:
             output = export_file(destination, extension, session, section)
-            self.statusBar().showMessage(f'Exported: {output}', 10000)
-            answer = QMessageBox.question(self, 'Export complete',
-                      f'Saved to:\n{output}\n\nOpen the folder?',
-                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if answer == QMessageBox.Yes:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(output.parent)))
+            self.statusBar().showMessage(f'Saved a copy: {output}', 10000)
+            self.status_label.setText(f'✓ Saved {output.name}')
         except Exception as exc:
-            QMessageBox.critical(self, 'Export failed', str(exc))
+            self._show_error('Could not save a copy',
+                             'Your work is still saved in SolScribe. Try another folder, or close the destination file and try again.', exc)
 
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:

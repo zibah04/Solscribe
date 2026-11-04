@@ -2,7 +2,7 @@
 
 **Private, offline-first LIVE speech-to-text and meeting documentation.** A native Windows 10/11 desktop app, not a website. Converts recorded conversations, meetings, lectures, voice notes and audio/video files into editable transcripts, minutes, memos, action lists and exportable documents.
 
-## Features · version 0.2.1
+## Features · version 0.2.2
 
 - Record from a Windows microphone into local 16 kHz WAV, with elapsed time and audio-level indicator. **Live transcription** runs in a separate worker and adds timestamped captions as the recording continues. **Live captions appear while recording**, generally in ~2-second audio chunks plus CPU processing time. Also includes experimental Windows PC-playback capture (WASAPI loopback) for online-meeting audio.
 - Import WAV, MP3, M4A, AAC, OGG, FLAC, WEBM, MP4 and several other media formats (decode support depends on PyAV / FFmpeg).
@@ -16,16 +16,16 @@
 
 ## Fastest start on Windows
 
-**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.2.1.exe` from a successful workflow artifact and install normally.
+**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.2.2.exe` from a successful workflow artifact and install normally.
 
 **Option B – from this source ZIP:**
 
 1. Install **Python 3.11 (64-bit)** from https://www.python.org/downloads/ (select *Add Python to PATH* during installation).
 2. Extract this ZIP to a folder (for example `Documents\SolScribe`).
 3. Double-click **`run_windows.bat`**. It will set up a private Python environment, install the libraries once, and open the native desktop window.
-4. For a live meeting, ensure **Live transcription during recording** is ticked, select your microphone and click **Record + live captions**. Caption lines appear in the Transcript tab in chunks. Click Stop to finish. For a saved recording or voice memo, choose **Import audio / video** and then **Transcribe**.
-5. For a more accurate final transcript, click **Transcribe** after stopping (you will be asked before replacing live captions).
-6. Enter meeting details and click **Generate summary + minutes + memo**. Review your Summary, Minutes, Memo and Action items tabs, edit as needed, and export using the top-right menu.
+4. For a live meeting, ensure **Show words while I speak** is ticked, select your microphone and click **Record meeting**. Caption lines appear in the Transcript tab in chunks. Click Stop to finish. For a saved recording or voice memo, choose **Import audio / video** and then **Create transcript**.
+5. For a more accurate final transcript, click **Create transcript** after stopping (you will be asked before replacing live captions).
+6. Enter meeting details and click **Create notes**. Review your Summary, Minutes, Memo and Action items tabs, edit as needed, and export using the top-right menu.
 
 The initial dependency installation and **first download of each Whisper model** require internet access. The live and full-transcription buttons may each use a selected Whisper model; choose `tiny`/`base` for responsive live captions. After the model has downloaded, live captions and standard transcription are completely local. No paid API keys are required. A computer with 8 GB RAM should start with `tiny`, `base` or `small`; `medium` / `large-v3` can be very slow or run out of memory on CPU.
 
@@ -37,7 +37,7 @@ Install Ollama from https://ollama.com/ and in Windows Terminal run:
 ollama pull llama3.2
 ```
 
-Keep Ollama running. Inside SolScribe select **Ollama · local AI**, leave the model field as `llama3.2` (or use another installed model), and click Generate. Minutes, memo and actions are produced with a fact-preserving prompt and remain editable. For very long meetings, the transcript is condensed in chunks. Even AI-generated notes must be reviewed against source audio.
+Keep Ollama running. Inside SolScribe open **Settings**, select **Polished notes**, then expand **Advanced writing setup**. Leave the model field as `llama3.2` (or use another installed model), and click Create notes. Minutes, memo and actions are produced with a fact-preserving prompt and remain editable. For very long meetings, the transcript is condensed in chunks. Even AI-generated notes must be reviewed against source audio.
 
 ### Make a portable Windows EXE
 
@@ -51,13 +51,19 @@ Keep **all files in `dist\SolScribe`** together; it is a bundled directory, not 
 
 Upload this project to a new GitHub repository, **including the hidden `.github` directory**. Select the **Actions → Build SolScribe for Windows → Run workflow**. After the workflow completes, open its run and download the **SolScribe-Windows** artifact, which contains a portable app ZIP and an installer `.exe`. GitHub workflow artifacts expire after the retention period, so store a copy for distribution.
 
-## Layout and live captions in 0.2.1
+## A simpler workflow in 0.2.2
+
+Record or add a recording, create a transcript, then click **Create notes**. Notes display as formatted documents that you can edit directly. Use **Save a copy** for Word or PDF.
+
+Quick notes work without extra software. If you select Polished notes in Settings but the optional writing helper is unavailable, SolScribe creates quick notes automatically and tells you which style was used. Advanced writing setup is tucked away in Settings.
+
+## Layout and live captions
 
 - The transcript has its own large workspace. Meeting metadata is in **Meeting details**; final-transcription model and language are in **Settings**.
-- The separate **Live model** defaults to `tiny` for CPU responsiveness. Captions update after roughly two seconds of audio plus recognition time; this is not instant word-by-word dictation.
+- **Fast captions** in Settings uses the `tiny` speech model for responsiveness. Captions update after roughly two seconds of audio plus recognition time; this is not instant word-by-word dictation.
 - Loading/download, recognition, and failure messages stay visible above the transcript. First use needs an internet connection to download the selected model. The recording is still saved during loading.
-- **Example meeting** opens saved sample text; it does not listen to your microphone. To see your own speech, select the correct input and click **Record + live captions** with the checkbox enabled. Watch the input-level meter.
-- The final short audio tail is processed on Stop. Wait for queued captions to finish. Use **Transcribe** after recording to improve accuracy with the final model.
+- **Example meeting** opens saved sample text; it does not listen to your microphone. To see your own speech, select the correct input and click **Record meeting** with the checkbox enabled. Watch the input-level meter.
+- The final short audio tail is processed on Stop. Wait for queued captions to finish. Use **Create transcript** after recording to improve accuracy with the final model.
 
 ## Privacy and important limitations
 
@@ -66,7 +72,7 @@ Upload this project to a new GitHub repository, **including the hidden `.github`
 - All session records, notes and transcripts reside in `%LOCALAPPDATA%\SolScribe\solscribe.db`; Whisper models are cached under `%LOCALAPPDATA%\SolScribe\models`.
 - PC audio (loopback) and microphone are separate capture choices; **simultaneous microphone + system-audio mixing is not implemented**. Recording online meetings with a headset can therefore omit your own voice when you select PC audio.
 - The app does **not automatically identify speakers**. Editable generic speaker labels are intentional, to avoid falsely claiming diarization.
-- **Live transcription is implemented**: it produces provisional captions in short audio chunks while recording. It is *near-live*, not instant word-by-word captions; actual delay depends on processor and model. On a slow CPU, captions may lag or omit audio when the queue fills. The **full original recording remains intact**; use post-recording Transcribe for completeness and better word boundaries.
+- **Live transcription is implemented**: it produces provisional captions in short audio chunks while recording. It is *near-live*, not instant word-by-word captions; actual delay depends on processor and model. On a slow CPU, captions may lag or omit audio when the queue fills. The **full original recording remains intact**; use **Improve transcript** after recording for completeness and better word boundaries.
 - Audio quality, background noise, overlapping speakers and accents can reduce accuracy. Live captions are not a substitute for independently verified official minutes.
 - The simple offline drafting mode is an **extractive draft** (verbatim excerpts), not deep semantic understanding. For polished contextual reports, choose Ollama.
 - The app is **not** a certified confidential-records management system: anyone with access to your Windows profile or database files may read them; protect your PC and secure your backups.
@@ -92,7 +98,7 @@ py -3.11 -m venv .venv
 
 **First transcription stuck on model loading**: the chosen model may still be downloading; test with `tiny` or `base`. A firewall may block access to Hugging Face models. If the model is already cached, internet is no longer required.
 
-**Live captions do not show up**: wait for the first speech-model download/initialization and about two seconds of audio plus processing. Try `tiny` for faster results on older laptops, or `base` for better accuracy. Live captions require a functioning microphone/PC-audio input and will not show during imported-file transcription, which uses the separate Transcribe button.
+**Live captions do not show up**: wait for the first speech-model download/initialization and about two seconds of audio plus processing. Try `tiny` for faster results on older laptops, or `base` for better accuracy. Live captions require a functioning microphone/PC-audio input and will not show during imported-file transcription, which uses the **Create transcript** button.
 
 **Mic not available**: enable Windows *Settings → Privacy & security → Microphone* and *Let desktop apps access your microphone*. Change the mic in SolScribe's bottom-right dropdown. For capturing other participants in a Teams/Zoom meeting, choose the experimental **PC audio: ...** device from that same dropdown; this captures computer playback only.
 

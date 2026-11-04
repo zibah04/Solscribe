@@ -52,7 +52,7 @@ class LiveTranscriptionWorker(QThread):
         if not self._has_speech(audio):
             self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
             return
-        self.status.emit('Recognizing speech… captions appear here as each short batch finishes')
+        self.status.emit('Writing down what you said…')
         segments_iter, _ = model.transcribe(
             audio, language=self.language, beam_size=1, best_of=1,
             vad_filter=False, condition_on_previous_text=False,
@@ -69,7 +69,7 @@ class LiveTranscriptionWorker(QThread):
                                  'speaker': 'Speaker', 'text': content})
         if segments:
             self.segment_batch.emit(segments)
-            self.status.emit('Listening · live captions update after about 2 seconds of audio plus processing')
+            self.status.emit('Listening · your words appear after a short pause')
         else:
             self.status.emit('Listening · no words recognized yet; check your microphone and language')
         self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
@@ -81,10 +81,10 @@ class LiveTranscriptionWorker(QThread):
                 factory = WhisperModel
             else:
                 factory = self._model_factory
-            self.status.emit(f'Loading live model ({self.model_name}) · first use downloads it; audio is being saved')
+            self.status.emit('Getting ready to listen · first use needs a download. Your recording is safe.')
             model = factory(self.model_name, device='cpu', compute_type='int8',
                             download_root=self.models_folder, cpu_threads=4)
-            self.status.emit('Listening · speak into your selected microphone; allow about 2 seconds plus processing')
+            self.status.emit('Listening · speak naturally; your words will appear below')
             chunker = PCMChunker(self.chunk_seconds)
             while True:
                 try:
@@ -99,6 +99,6 @@ class LiveTranscriptionWorker(QThread):
             piece = chunker.flush(minimum_seconds=0.05)
             if piece:
                 self._infer(model, piece)
-            self.status.emit('Live captions complete · use Transcribe for a polished final transcript')
+            self.status.emit('Your words are saved · you can edit them or create notes')
         except Exception as exc:
             self.failed.emit(f'{type(exc).__name__}: {exc}')
