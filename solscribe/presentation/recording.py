@@ -16,7 +16,7 @@ class RecordingActions:
     def _live_option_changed(self, enabled):
         self.settings.setValue('live_captions', enabled)
         if not self.record_timer.isActive():
-            self.record_btn.setText('Record meeting')
+            self.record_btn.setText(self.record_label())
 
     def toggle_record(self):
         if self.record_timer.isActive():
@@ -214,7 +214,7 @@ class RecordingActions:
             self.record_timer.start()
             self.record_btn.setText('Stop recording')
         else:
-            self.record_btn.setText('Record meeting')
+            self.record_btn.setText(self.record_label())
             self.record_btn.setObjectName('Record')
             self.record_btn.style().unpolish(self.record_btn)
             self.record_btn.style().polish(self.record_btn)

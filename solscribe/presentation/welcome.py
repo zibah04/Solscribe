@@ -26,6 +26,10 @@ class QuickGuide(QWizard):
         self.appearance.setAccessibleName('Guide appearance')
         self.appearance.currentIndexChanged.connect(lambda: window.set_theme(self.appearance.currentData()))
         first.addWidget(self.appearance)
+        first.addWidget(QLabel('What would you like to capture?'))
+        self.purpose = self.copy_combo(window.mode_combo, 'Guide recording purpose')
+        first.addWidget(self.purpose)
+        self.add_text(first, 'Meeting creates summaries and minutes. Lecture creates study notes and revision cards. You can switch later; both sets of notes are kept.')
         first.addStretch(1)
 
         audio = self.page_layout('2 of 4 · Choose your sound',
@@ -41,7 +45,7 @@ class QuickGuide(QWizard):
         audio.addStretch(1)
 
         record = self.page_layout('3 of 4 · Record and review',
-            'Click Record meeting and watch the sound meter. On first use, a speech model downloads before Listening appears. '
+            'Click Record meeting or Record lecture and watch the sound meter. On first use, a speech model downloads before Listening appears. '
             'Words arrive in short batches as you speak. Click Stop recording when finished and wait for the last words.')
         self.live_words = QCheckBox('Show words while I speak')
         self.live_words.setChecked(window.live_checkbox.isChecked())
@@ -52,8 +56,9 @@ class QuickGuide(QWizard):
 
         notes = self.page_layout('4 of 4 · Create, save and stay current',
             'Click Create notes for a summary, minutes and action items. Review names, decisions and dates, then use Save a copy '
-            'for Word or PDF. Changes save automatically. Settings also has backup and restore.')
-        self.practice = QCheckBox('Open a sample meeting so I can practise')
+            'for Word or PDF. In Lecture, choose Create study notes, then practise with Revision: try answering, reveal the answer, '
+            'and check Sources. Verify technical terms and formulas. Changes save automatically. Settings also has backup and restore.')
+        self.practice = QCheckBox('Open a sample so I can practise')
         self.practice.setChecked(False)
         notes.addWidget(self.practice)
         self.add_text(notes, 'The sample contains saved text; it does not listen to your microphone.')

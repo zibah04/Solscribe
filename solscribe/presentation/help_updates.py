@@ -104,6 +104,7 @@ class HelpUpdates:
 
     def _guide_finished(self, guide, result):
         if result == QDialog.Accepted:
+            self.mode_combo.setCurrentIndex(max(0, self.mode_combo.findData(guide.purpose.currentData())))
             self.capture_mode.setCurrentIndex(max(0, self.capture_mode.findData(guide.source.currentData())))
             self.mic_combo.setCurrentIndex(max(0, self.mic_combo.findData(guide.microphone.currentData())))
             self.live_checkbox.setChecked(guide.live_words.isChecked())

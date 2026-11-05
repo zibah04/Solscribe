@@ -1,4 +1,17 @@
-# SolScribe 0.4.1 beta
+# SolScribe 0.5.0 beta
+
+- Lecture mode adds an editable outline, key concepts, definitions, examples and revision practice. Each selected passage keeps timestamped original words and a jump to the transcript.
+- Revision cards hide the answer until requested. Questions and answers are editable; the original evidence stays available separately.
+- Quick study notes run locally without an extra writing service. English source cues identify definitions/examples. Long lectures select passages across the full transcript rather than only its beginning; this is a study aid, not an exhaustive textbook.
+- Optional polished study notes use the existing local writing helper. Every source chunk is processed; invalid sources, unsupported numbers or unavailable helpers fall back to quick notes. AI wording still requires source review.
+- Meeting and lecture notes are saved separately. Switching modes preserves both, as do upgrades, backups and project JSON. Transcript edits show when study notes refer to older words.
+- The four-step guide now introduces Lecture and offers a sample lecture. Light/dark purple themes, updates and the zibah@2026 footer are included from 0.4.1.
+
+This remains an unsigned beta. Real lecture speech accuracy, technical subjects, physical audio devices, target laptops and accessibility need user acceptance testing. No slide/PDF ingestion, automatic equation understanding or exam prediction is included. See docs/LECTURE_MODE.md and docs/050_REPORT.md.
+
+---
+
+## Previous version: SolScribe 0.4.1 beta
 
 - A four-step first-use guide sets appearance, audio source and live words, explains recording/review/notes, and offers optional sample practice. Skip it or reopen Guide from the footer or Settings.
 - Updates in the footer and Settings check the official GitHub releases. Startup checks are opt-in and throttled to once per day after a successful check. Recordings and notes are not part of the request.

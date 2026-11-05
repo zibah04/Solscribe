@@ -1,9 +1,9 @@
-SOLSCRIBE 0.4.1 BETA
+SOLSCRIBE 0.5.0 BETA
 Clear words. Useful notes. Saved on your PC.
 
 GET STARTED
 1. Close any older SolScribe window. Back up existing work before upgrading.
-2. Run SolScribe-Setup-0.4.1.exe, or extract the portable ZIP and open
+2. Run SolScribe-Setup-0.5.0.exe, or extract the portable ZIP and open
    SolScribe.exe inside its whole folder. No separate Python is needed.
 3. The first-use guide helps with appearance, inputs and basic usage.
    You can skip it or reopen it from Guide in the footer or Settings.
@@ -15,7 +15,13 @@ GET STARTED
 6. Click Stop recording. Wait for saving and final captions to finish.
 7. Review words and speaker names. Improve transcript lets you compare a
    new draft before replacing your edits. Existing notes remain saved.
-8. Click Create notes, review and edit the draft, then Save a copy.
+8. For meetings, click Create notes, review and edit the draft, then Save a copy.
+   For lectures, choose Lecture beside the title, then Create study notes.
+   Notes gives an outline, concepts, definitions and examples. In Revision,
+   try answering before Show answer. Check source opens the original excerpt;
+   Go to transcript selects its position. Save a copy exports the selected tab.
+   Meeting documents and study notes are kept separately when switching modes.
+   Verify technical terms and formulas against your course materials.
 
 ALREADY HAVE A RECORDING OR TEXT?
 Add a recording, then Create transcript. Paste text uses existing words.

@@ -42,6 +42,11 @@ def srt_text(segments):
 
 
 def section_content(session, section):
+    if section in ('Study notes', 'Revision cards', 'Study sources'):
+        from .lecture import render_cards
+        if section == 'Study notes':
+            return '*Draft study aid · check against your course materials.*\n\n' + (session.get('study_notes') or 'Create or write study notes first.')
+        return render_cards(session.get('study_items') or [], sources=section == 'Study sources')
     if section == 'Action register':
         from .intelligence import render_actions
         from .reports import stamp

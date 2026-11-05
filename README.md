@@ -1,8 +1,10 @@
 # SolScribe
 
-Private meeting recording, transcripts and useful notes for Windows 10/11 x64. SolScribe 0.4.0 is a **beta**: light and dark themes retain the familiar purple palette, with a simpler workspace that adapts to smaller displays.
+Private meeting and lecture recording, transcripts and useful notes for Windows 10/11 x64. SolScribe 0.4.0 is a **beta**: light and dark themes retain the familiar purple palette, with a simpler workspace that adapts to smaller displays.
 
 The validated 0.4.1 beta build adds verified in-app updates, an optional four-step first-use guide, and the `zibah@2026` footer. See [update delivery and setup](docs/UPDATES.md) and [0.4.1 verification](docs/041_REPORT.md). The published installer below remains 0.4.0 until the new beta is approved for public publication. Its Windows and Linux tests have passed.
+
+The 0.5.0 beta source adds **Lecture** mode: study notes, key concepts, explicit definitions and examples, editable revision cards with revealable answers, and timestamped original excerpts. Meeting documents and study notes are saved separately. See [lecture usage and limits](docs/LECTURE_MODE.md). Windows validation and private release preparation are in progress; the public installer below remains 0.4.0.
 
 ## Get started
 
@@ -27,6 +29,12 @@ For an existing file, use **Add a recording**, then **Create transcript**. **Pas
 - Draft review checkboxes clear after edits. Source checks help review AI output but cannot prove its factual accuracy.
 - Automatic saving, recoverable meeting trash, explicit audio ownership, backup/restore and recovery drafts protect existing work.
 - The sidebar gives way to a compact navigation bar on small windows. The main workspace scrolls; recording controls remain visible. Appearance is available in Settings in either layout.
+
+## Lecture study tools (0.5.0 beta)
+
+Choose **Lecture** beside the title. Record a lecture, add a recording or paste its transcript, then choose **Create study notes**. In **Study notes**, Notes contains an editable outline, concepts, definitions and examples; Revision lets you try a question before revealing its source answer; Sources retains the original excerpt and a button to select its transcript position. Save a copy exports the selected notes, cards or sources. JSON preserves the whole project.
+
+Quick study notes use selected original words and need no writing helper. English definition/example detection is heuristic; passages are selected across the lecture, including its end. Polished notes can rephrase concepts and questions with the optional local writing helper. Both need review, especially names, formulas and technical terms. Editing the transcript keeps existing study work and shows a warning that it uses earlier words. Recreating notes asks before replacing edits. Lecture mode does not read slides/PDFs, interpret handwritten equations or predict exam questions.
 
 ## Optional polished writing
 
@@ -62,7 +70,7 @@ Audio and transcript processing is local by default. Speech models require a fir
 
 The database, WAVs, backups and drafts are **not encrypted by SolScribe**. Anyone with access to the Windows profile can read them. Use Windows account protection and BitLocker/device encryption where available; secure exported copies too. An in-app encrypted vault is deferred until key recovery and migration can be designed without locking people out of existing files.
 
-The build is unsigned unless `SIGNING_STATUS.txt` verifies otherwise. No signing certificate is supplied. Keep Windows security protections enabled. Combined capture has no acoustic echo cancellation; headphones help avoid duplicate playback through the microphone. Physical audio reliability, mixed-source drift, multilingual accuracy, screen-reader behavior and 8 GB laptop performance need the checks in [Windows acceptance](docs/WINDOWS_ACCEPTANCE.md) before a wider release. Live captions are provisional; driver/device failures can cause missing audio, with warnings where detected. No automatic updates, syncing, translation or diarization are included.
+The build is unsigned unless `SIGNING_STATUS.txt` verifies otherwise. No signing certificate is supplied. Keep Windows security protections enabled. Combined capture has no acoustic echo cancellation; headphones help avoid duplicate playback through the microphone. Physical audio reliability, mixed-source drift, multilingual accuracy, screen-reader behavior and 8 GB laptop performance need the checks in [Windows acceptance](docs/WINDOWS_ACCEPTANCE.md) before a wider release. Live captions are provisional; driver/device failures can cause missing audio, with warnings where detected. Updates in 0.4.1 and later are checked and installed only with your chosen settings and confirmation. No syncing, translation or diarization is included.
 
 ## Keyboard access
 

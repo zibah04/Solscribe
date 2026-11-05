@@ -91,6 +91,26 @@ def main():
         if window._guide.currentId() != 3:
             raise RuntimeError('Packaged setup guide is incomplete')
         window._guide.reject()
+        # Exercise the actual bundled lecture study tools without a writing
+        # helper or network dependency. Keep any previous documents intact.
+        from solscribe.lecture import draft_lecture
+        window.mode_combo.setCurrentIndex(window.mode_combo.findData('lecture'))
+        window.load_demo()
+        if not window.persist():
+            raise RuntimeError('Lecture sample could not be saved')
+        window._report_session_id = window.session_id
+        window._reports_ready(draft_lecture(window.current_session))
+        window.study_tabs.setCurrentIndex(1)
+        window.reveal_answer.click()
+        app.processEvents()
+        if not window.revision_answer.isVisible() or not window.revision_answer.toPlainText():
+            raise RuntimeError('Packaged lecture revision cards are incomplete')
+        window._revision_source()
+        if not window.study_quote.toPlainText():
+            raise RuntimeError('Packaged study source evidence is missing')
+        window._study_jump()
+        if window.tabs.currentIndex() != 0:
+            raise RuntimeError('Packaged lecture source navigation failed')
         window.close()
         return 0
     window.start_first_run()

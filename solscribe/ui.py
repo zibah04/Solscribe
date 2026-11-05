@@ -27,6 +27,8 @@ from .presentation.transcripts import TranscriptActions
 from .presentation.actions import ActionRegister
 from .presentation.layout import WindowLayout
 from .presentation.help_updates import HelpUpdates
+from .presentation.study import StudyTools
+from .lecture import draft_lecture, draft_lecture_ai
 from .repository import timestamp
 from .themes import THEMES, palette, stylesheet
 from . import __version__
@@ -63,19 +65,22 @@ class ReportWorker(QThread):
 
     def run(self):
         try:
+            lecture = self.session.get('session_type') == 'lecture'
+            local_draft = draft_lecture if lecture else draft_local
+            ai_draft = draft_lecture_ai if lecture else draft_ai
             if self.method == 'ai':
-                self.status.emit('Writing your meeting notes…')
+                self.status.emit('Writing your study notes…' if lecture else 'Writing your meeting notes…')
                 try:
                     with using_client(self.client):
-                        output = draft_ai(self.session, self.model)
+                        output = ai_draft(self.session, self.model)
                 except (OSError, ValueError, URLError) as exc:
                     self.status.emit('Making quick notes from your transcript instead…')
-                    output = draft_local(self.session)
+                    output = local_draft(self.session)
                     output['fallback'] = True
                     output['details'] = f'{type(exc).__name__}: {exc}'
             else:
                 self.status.emit('Creating notes from your transcript…')
-                output = draft_local(self.session)
+                output = local_draft(self.session)
             if self.client.cancelled.is_set():
                 raise Cancelled()
             self.result_emitted = True
@@ -88,7 +93,7 @@ class ReportWorker(QThread):
             self.client.release()
 
 
-class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, RecordingActions, StorageActions, QMainWindow):
+class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, TranscriptActions, RecordingActions, StorageActions, QMainWindow):
     def __init__(self):
         super().__init__()
         self.store = Store()
@@ -264,6 +269,8 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
         self._loading = True
         self.session_id = session_id
         self.current_session = session
+        self.mode_combo.setCurrentIndex(self.mode_combo.findData(session.get('session_type', 'meeting')))
+        self.load_study(session)
         self.title_edit.setText(session['title'])
         self.title_edit.setCursorPosition(0)
         self.title_edit.setToolTip(session['title'])
@@ -309,7 +316,7 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             self.play_btn.setEnabled(False)
         self.audio_length.setText(stamp(session.get('duration') or 0))
         self._loading = False
-        self.update_actions()
+        self.apply_session_type()
         self.status_label.setText('Saved on this PC · changes save automatically')
 
     def update_actions(self):
@@ -322,6 +329,9 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
         storage_busy = self._storage_active or self._update_install_active or bool(self._storage_worker and self._storage_worker.isRunning())
         stopping = self._stopping_active or bool(self._stop_worker and self._stop_worker.isRunning())
         busy = transcribing or reporting or live_working or storage_busy or stopping
+        self.mode_combo.setEnabled(not busy and not recording)
+        self.study_edit.setReadOnly(reporting or storage_busy)
+        self.study_tabs.widget(1).setEnabled(not reporting and not storage_busy)
         self.guide_btn.setEnabled(not busy and not recording)
         self.settings_guide_btn.setEnabled(not busy and not recording)
         has_words = bool(self.current_session and self.current_session.get('segments'))
@@ -402,7 +412,8 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             return
         if not self.persist():
             return
-        session_id = self.store.create('Untitled meeting')
+        mode = self.session_type() if self.session_id else str(self.settings.value('new_session_type', 'meeting'))
+        session_id = self.store.create('Untitled lecture' if mode == 'lecture' else 'Untitled meeting', session_type=mode)
         self.search_library.clear()
         self.reload_library(select_id=session_id)
         self.focus_tab(0)
@@ -417,10 +428,10 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             return
         if not self.persist():
             return
-        session_id = self.store.demo()
+        session_id = self.store.demo_lecture() if self.session_type() == 'lecture' else self.store.demo()
         self.search_library.clear()
         self.reload_library(select_id=session_id)
-        self.caption_status.setText('Example meeting · sample text. Click Record meeting to capture your own words.')
+        self.caption_status.setText('Example lecture · saved sample text, not live audio.' if self.session_type() == 'lecture' else 'Example meeting · sample text. Click Record meeting to capture your own words.')
         self.statusBar().showMessage('Example meeting loaded. Try Create notes.', 8000)
 
     def import_audio(self, path=None):
@@ -440,7 +451,7 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             return
         if not self.persist():
             return
-        session_id = self.store.create(path.stem.replace('_', ' '), str(path.resolve()))
+        session_id = self.store.create(path.stem.replace('_', ' '), str(path.resolve()), session_type=self.session_type())
         self.search_library.clear()
         self.reload_library(select_id=session_id)
         self.status_label.setText('Ready to transcribe. Files stay in their original location.')
@@ -457,7 +468,7 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             return
         if not self.persist():
             return
-        session_id = self.store.create('Pasted meeting notes')
+        session_id = self.store.create('Pasted lecture' if self.session_type() == 'lecture' else 'Pasted meeting notes', session_type=self.session_type())
         lines = [line.strip() for line in content.splitlines() if line.strip()]
         segments = [{'start': 0, 'end': 0, 'speaker': 'Written notes', 'text': line} for line in lines]
         self.store.update(session_id, segments=segments, model='pasted text')
@@ -516,7 +527,8 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             QMessageBox.information(self, 'Transcript needed',
                                    'Record or import audio and transcribe it, or paste meeting notes first.')
             return
-        if any(session.get(k) for k in ('summary', 'minutes', 'memo', 'actions')):
+        fields = ('study_notes', 'study_items') if session.get('session_type') == 'lecture' else ('summary', 'minutes', 'memo', 'actions')
+        if any(session.get(k) for k in fields):
             answer = QMessageBox.question(self, 'Replace current documents?',
                 'Create fresh notes and replace your current edits? Your transcript will be kept.',
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
@@ -547,12 +559,17 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
     def _reports_ready(self, output):
         self.progress.hide()
         target_id = self._report_session_id
-        self.store.update(target_id, summary=output['summary'], minutes=output['minutes'],
+        lecture = 'study_notes' in output
+        if lecture:
+            self.store.update(target_id, study_notes=output['study_notes'], study_items=output['study_items'],
+                              study_source_hash=output['study_source_hash'], study_warnings=output.get('warnings', []))
+        else:
+            self.store.update(target_id, summary=output['summary'], minutes=output['minutes'],
                           memo=output['memo'], actions=output['actions'], action_items=output.get('action_items', []),
                           notes_warnings=output.get('warnings', []), reviewed_at='')
         if self.session_id == target_id:
             self.load_session(target_id)
-        self.focus_tab(1)
+        self.focus_tab(7 if lecture else 1)
         if output.get('fallback'):
             self._notes_notice = 'Quick notes are ready. The optional writing helper is unavailable.'
             self._notes_details = output.get('details', '')
@@ -560,7 +577,7 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
             self._notes_notice = ''
             self._notes_details = ''
         self.status_label.setText('✓ Your notes are ready. Edit anything, then save a copy.')
-        self.statusBar().showMessage('Summary, minutes, memo and action list saved.', 9000)
+        self.statusBar().showMessage('Study notes and revision cards saved.' if lecture else 'Summary, minutes, memo and action list saved.', 9000)
         self.update_actions()
 
     def _report_failed(self, message):
@@ -618,6 +635,7 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
         new_title = self.title_edit.text().strip() or 'Untitled meeting'
         try:
             self.store.update(self.session_id, title=new_title, segments=segments,
+                              session_type=self.session_type(), study_notes=self.study_edit.toMarkdown().strip(), study_items=self.study_items,
                               meeting_date=self.date_edit.text().strip(),
                               attendees=self.attendees_edit.text().strip(),
                               location=self.location_edit.text().strip(),
@@ -630,6 +648,7 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
                               action_items=self.action_values(),
                               reviewed_at=(self.current_session.get('reviewed_at') or timestamp()) if self.review_checks[0].isChecked() else '')
             self.current_session = self.store.get(self.session_id)
+            self.refresh_study_notice(self.current_session)
         except Exception as exc:
             self._save_error = str(exc)
             self.status_label.setText('Changes are not saved yet. Check available disk space and try again.')
@@ -647,6 +666,8 @@ class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, R
         return True
 
     def current_section(self):
+        if self.tabs.currentIndex() == 7:
+            return ('Study notes', 'Revision cards', 'Study sources')[self.study_tabs.currentIndex()]
         if self.tabs.currentIndex() == 4 and self.action_tabs.currentIndex() == 0:
             return 'Action register'
         return {0: 'Transcript', 1: 'Summary', 2: 'Minutes', 3: 'Memo', 4: 'Action items'}.get(self.tabs.currentIndex(), 'Transcript')

@@ -16,7 +16,9 @@ log = logging.getLogger(__name__)
 FIELDS = {'title', 'audio_path', 'duration', 'language', 'model', 'segments',
           'meeting_date', 'attendees', 'location', 'chair', 'agenda', 'summary', 'minutes',
           'memo', 'actions', 'notes', 'updated_at', 'action_items', 'transcript_history', 'recording_state', 'recording_pid', 'notes_warnings', 'reviewed_at'}
-JSON_FIELDS = {'segments': [], 'action_items': [], 'transcript_history': [], 'notes_warnings': []}
+FIELDS |= {'session_type', 'study_notes', 'study_items', 'study_source_hash', 'study_warnings'}
+JSON_FIELDS = {'segments': [], 'action_items': [], 'transcript_history': [], 'notes_warnings': [],
+               'study_items': [], 'study_warnings': []}
 
 
 def data_dir() -> Path:
@@ -50,7 +52,9 @@ class Store:
                     raise sqlite3.DatabaseError('Meeting database needs recovery from a backup')
                 version = connection.execute('PRAGMA user_version').fetchone()[0]
             backups = sorted(self.backups.glob('auto-*.db'))
-            if version < 4 or not backups or datetime.fromtimestamp(backups[-1].stat().st_mtime).date() != datetime.now().date():
+            if version > 5:
+                raise sqlite3.DatabaseError('This library needs a newer version of SolScribe')
+            if version < 5 or not backups or datetime.fromtimestamp(backups[-1].stat().st_mtime).date() != datetime.now().date():
                 self.backup_database(self.backups / f'auto-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}.db')
                 for old in sorted(self.backups.glob('auto-*.db'))[:-5]:
                     old.unlink()
@@ -66,7 +70,10 @@ class Store:
             columns = {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}
             for name, definition in {'summary': "TEXT DEFAULT ''", 'deleted_at': "TEXT DEFAULT ''",
                                      'action_items': "TEXT DEFAULT '[]'", 'transcript_history': "TEXT DEFAULT '[]'",
-                                     'recording_state': "TEXT DEFAULT ''", 'recording_pid': 'INTEGER DEFAULT 0', 'notes_warnings': "TEXT DEFAULT '[]'", 'reviewed_at': "TEXT DEFAULT ''"}.items():
+                                     'recording_state': "TEXT DEFAULT ''", 'recording_pid': 'INTEGER DEFAULT 0', 'notes_warnings': "TEXT DEFAULT '[]'", 'reviewed_at': "TEXT DEFAULT ''",
+                                     'session_type': "TEXT DEFAULT 'meeting'", 'study_notes': "TEXT DEFAULT ''",
+                                     'study_items': "TEXT DEFAULT '[]'", 'study_source_hash': "TEXT DEFAULT ''",
+                                     'study_warnings': "TEXT DEFAULT '[]'"}.items():
                 if name not in columns:
                     conn.execute(f'ALTER TABLE sessions ADD COLUMN {name} {definition}')
             conn.execute('''CREATE TABLE IF NOT EXISTS recordings (
@@ -87,7 +94,7 @@ class Store:
                     self._link(conn, row['id'], row['audio_path'], 'main', False, legacy=True)
             conn.execute('CREATE INDEX IF NOT EXISTS ix_sessions_updated ON sessions(updated_at DESC)')
             conn.execute('CREATE INDEX IF NOT EXISTS ix_recording_refs ON session_recordings(recording_id)')
-            conn.execute('PRAGMA user_version=4')
+            conn.execute('PRAGMA user_version=5')
         self.recover_drafts()
         self.recover_recordings()
 
@@ -122,11 +129,19 @@ class Store:
                 if field == 'segments':
                     from .transcripts import validate_segments
                     validate_segments(value)
+                if field == 'study_items':
+                    from .lecture import validate_items
+                    validate_items(value)
                 result[field] = value
             except (ValueError, TypeError):
                 # Never turn damaged saved content into an empty editable
                 # meeting: autosave could then destroy the original evidence.
                 raise sqlite3.DataError(f'Saved {field} needs recovery; original database retained') from None
+        result.setdefault('session_type', 'meeting')
+        for field in ('study_notes', 'study_source_hash'):
+            result.setdefault(field, '')
+        if result['session_type'] not in ('meeting', 'lecture'):
+            raise sqlite3.DataError('Saved recording mode needs recovery')
         return result
 
     def _link(self, conn, sid: str, path: str, role: str, owned: bool, *, legacy=False, offset=0.0) -> str:
@@ -151,11 +166,13 @@ class Store:
         conn.execute('INSERT OR REPLACE INTO session_recordings(session_id,recording_id,role,offset_seconds) VALUES(?,?,?,?)', (sid, rid, role, float(offset)))
         return rid
 
-    def create(self, title='Untitled session', audio_path='', *, audio_owned=False):
+    def create(self, title='Untitled session', audio_path='', *, audio_owned=False, session_type='meeting'):
+        if session_type not in ('meeting', 'lecture'):
+            raise ValueError('Unknown recording mode')
         sid, now = uuid.uuid4().hex, timestamp()
         with self.connect() as conn:
-            conn.execute('INSERT INTO sessions(id,created_at,updated_at,title,audio_path,meeting_date) VALUES(?,?,?,?,?,?)',
-                         (sid, now, now, title, str(audio_path), datetime.now().date().isoformat()))
+            conn.execute('INSERT INTO sessions(id,created_at,updated_at,title,audio_path,meeting_date,session_type) VALUES(?,?,?,?,?,?,?)',
+                         (sid, now, now, title, str(audio_path), datetime.now().date().isoformat(), session_type))
             if audio_path:
                 self._link(conn, sid, str(audio_path), 'main', audio_owned)
         return sid
@@ -175,6 +192,11 @@ class Store:
         values = {key: value for key, value in values.items() if key in FIELDS and key != 'updated_at'}
         if not values:
             return
+        if 'session_type' in values and values['session_type'] not in ('meeting', 'lecture'):
+            raise ValueError('Unknown recording mode')
+        if 'study_items' in values:
+            from .lecture import validate_items
+            validate_items(values['study_items'])
         for field in JSON_FIELDS:
             if field in values and not isinstance(values[field], list):
                 raise ValueError(f'{field} must be a list')
@@ -322,6 +344,19 @@ class Store:
                 self.recovery_notices.append('Recovered audio written before an interrupted recording.')
             except (OSError, ValueError):
                 log.warning('An interrupted recording could not be repaired; original retained')
+
+    def demo_lecture(self):
+        sid = self.create('Sample · How plants use light', session_type='lecture')
+        words = [
+            'Photosynthesis is a process that converts light energy into chemical energy.',
+            'Chlorophyll is a green pigment that absorbs light. It is not an energy source itself.',
+            'For example, a leaf exposed to light can make sugars from carbon dioxide and water.',
+            'A limiting factor means a condition that restricts the rate of a process.',
+            'For instance, adding more light does not increase the rate when carbon dioxide is limiting.',
+            'Remember to distinguish correlation from causation when interpreting a graph.']
+        self.update(sid, segments=[{'start': i * 30.0, 'end': i * 30.0 + 20,
+                    'speaker': 'Lecturer', 'text': text} for i, text in enumerate(words)], model='sample text')
+        return sid
 
     def demo(self):
         session_id = self.create('Sample · Weekly project meeting')

@@ -3,7 +3,7 @@ name: Build SolScribe for Windows
 on:
   workflow_dispatch:
   push:
-    branches: [main, master, codex/windows-build-v0.2, codex/solscribe-040-remediation, codex/solscribe-041-updates-guide]
+    branches: [main, master, codex/windows-build-v0.2, codex/solscribe-040-remediation, codex/solscribe-041-updates-guide, codex/solscribe-050-lecture-mode]
     paths:
       - 'app.py'
       - 'solscribe/**'
@@ -58,7 +58,7 @@ jobs:
         run: |
           foreach ($scale in @('1', '1.25', '2')) {
             $env:QT_SCALE_FACTOR = $scale
-            python -m pytest -q tests/test_release.py --junitxml="layout-$scale.xml"
+            python -m pytest -q tests/test_release.py tests/test_lecture.py::test_lecture_mode_at_laptop_sizes --junitxml="layout-$scale.xml"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
       - name: Reproducible synthetic performance measurements

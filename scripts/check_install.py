@@ -40,13 +40,19 @@ def main():
         with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
             row = connection.execute('SELECT title, summary, audio_path, segments FROM sessions WHERE id = ?',
                                      ((root / 'seed-id.txt').read_text(),)).fetchone()
-            assert connection.execute('PRAGMA user_version').fetchone()[0] == 4
+            assert connection.execute('PRAGMA user_version').fetchone()[0] == 5
             assert connection.execute('SELECT owned FROM recordings').fetchone()[0] == 0, 'Legacy media was implicitly claimed'
+            lectures = connection.execute("SELECT study_notes, study_items, study_source_hash FROM sessions WHERE session_type='lecture' AND study_notes != ''").fetchall()
+            assert lectures, 'Lecture study data was not retained'
+            for notes, items, fingerprint in lectures:
+                assert 'Definitions' in notes and fingerprint
+                cards = [item for item in json.loads(items) if item['kind'] == 'revision']
+                assert cards and all(card['answer'] and card['evidence'] for card in cards)
         assert row and row[:2] == ('Existing meeting', 'Notes that must survive installation and removal.'), row
         assert json.loads(row[3])[0]['speaker'] == 'Alice'
         with wave.open(row[2], 'rb') as recording:
             assert recording.getnframes() == 1600
-        print('PASS: migrated existing meeting, edited notes, speaker name, conservative ownership and audio survived')
+        print('PASS: existing meeting, speaker name, audio and lecture notes/cards/evidence survived')
 
 
 if __name__ == '__main__':
