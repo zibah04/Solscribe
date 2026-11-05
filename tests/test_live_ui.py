@@ -46,6 +46,9 @@ def window(app, tmp_path, monkeypatch):
     yield w
     if w.record_timer.isActive():
         w.toggle_record()
+    if w._stop_worker:
+        w._stop_worker.wait(10000)
+        app.processEvents()
     if w._live_worker:
         w._live_worker.stop()
         w._live_worker.wait(5000)

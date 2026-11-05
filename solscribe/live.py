@@ -13,7 +13,9 @@ import threading
 
 import numpy as np
 from PySide6.QtCore import QThread, Signal
-from .pcm import PCMChunker
+from .audio import AudioPacket
+from .captioning import CaptionEngine
+from .speech_resources import cpu_threads, release_model
 
 
 class LiveTranscriptionWorker(QThread):
@@ -37,45 +39,22 @@ class LiveTranscriptionWorker(QThread):
         self._stop_event = threading.Event()
         self._model_factory = model_factory
         self.processed_seconds = 0.0
-        self.dropped_audio = 0
+        self.dropped_audio = 0.0
+        self.metrics = {}
+        self._cancel = threading.Event()
 
     def stop(self):
         self._stop_event.set()
 
-    @staticmethod
-    def _has_speech(audio):
-        # Energy gate rejects near-silence which can trigger Whisper hallucination.
-        return bool(audio.size and np.sqrt(np.mean(audio * audio)) >= 0.003)
-
-    def _infer(self, model, piece):
-        offset, audio = piece
-        if not self._has_speech(audio):
-            self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
-            return
-        self.status.emit('Writing down what you said…')
-        segments_iter, _ = model.transcribe(
-            audio, language=self.language, beam_size=1, best_of=1,
-            vad_filter=False, condition_on_previous_text=False,
-            temperature=0.0, no_speech_threshold=0.5,
-        )
-        segments = []
-        for part in segments_iter:
-            content = (part.text or '').strip()
-            if content:
-                start = max(0.0, float(part.start))
-                end = max(start, float(part.end))
-                segments.append({'start': round(offset + start, 2),
-                                 'end': round(offset + end, 2),
-                                 'speaker': 'Speaker', 'text': content})
-        if segments:
-            self.segment_batch.emit(segments)
-            self.status.emit('Listening · your words appear after a short pause')
-        else:
-            self.status.emit('Listening · no words recognized yet; check your microphone and language')
-        self.processed_seconds = offset + len(audio) / PCMChunker.OUTPUT_RATE
+    def cancel(self):
+        self._cancel.set()
+        self._stop_event.set()
 
     def run(self):
+        model = None
         try:
+            if self._cancel.is_set():
+                return
             if self._model_factory is None:
                 from faster_whisper import WhisperModel
                 factory = WhisperModel
@@ -83,22 +62,42 @@ class LiveTranscriptionWorker(QThread):
                 factory = self._model_factory
             self.status.emit('Getting ready to listen · first use needs a download. Your recording is safe.')
             model = factory(self.model_name, device='cpu', compute_type='int8',
-                            download_root=self.models_folder, cpu_threads=4)
+                            download_root=self.models_folder, cpu_threads=cpu_threads())
+            if self._cancel.is_set():
+                return
+            engine = CaptionEngine(model, self.language, chunk_seconds=self.chunk_seconds, notify=self.status.emit)
             self.status.emit('Listening · speak naturally; your words will appear below')
-            chunker = PCMChunker(self.chunk_seconds)
-            while True:
+            legacy_frame = 0
+            while not self._cancel.is_set():
                 try:
-                    item = self.audio_queue.get(timeout=0.15)
+                    packet = self.audio_queue.get(timeout=.1)
                 except queue.Empty:
                     if self._stop_event.is_set():
                         break
                     continue
-                raw, sample_rate = item
-                for piece in chunker.feed(raw, sample_rate):
-                    self._infer(model, piece)
-            piece = chunker.flush(minimum_seconds=0.05)
-            if piece:
-                self._infer(model, piece)
-            self.status.emit('Your words are saved · you can edit them or create notes')
+                if not isinstance(packet, AudioPacket):
+                    raw, rate = packet
+                    packet = AudioPacket(raw, rate, legacy_frame)
+                    legacy_frame += packet.frames
+                parts = engine.accept(packet)
+                self.processed_seconds = engine.processed_seconds
+                self.dropped_audio = engine.skipped_seconds
+                if parts:
+                    self.segment_batch.emit(parts)
+            if not self._cancel.is_set():
+                tail = engine.finish()
+                self.processed_seconds = engine.processed_seconds
+                if tail:
+                    self.segment_batch.emit(tail)
+                self.status.emit('Your words are saved · you can review and improve the transcript')
+            times = list(engine.processing_times)
+            self.metrics = {'processed_until_s': self.processed_seconds, 'skipped_s': engine.skipped_seconds,
+                            'window_count_sampled': len(times),
+                            'mean_processing_s': float(np.mean(times)) if times else 0,
+                            'max_processing_s': max(times, default=0)}
         except Exception as exc:
-            self.failed.emit(f'{type(exc).__name__}: {exc}')
+            if not self._cancel.is_set():
+                self.failed.emit(f'{type(exc).__name__}: {exc}')
+        finally:
+            if model is not None:
+                release_model(model)

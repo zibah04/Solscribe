@@ -22,9 +22,12 @@ from PySide6.QtWidgets import (
 
 from .storage import Store
 from .presentation.storage import StorageActions
+from .presentation.recording import RecordingActions
+from .presentation.transcripts import TranscriptActions
 from .themes import THEMES, palette, stylesheet
 from . import __version__
 from .recorder import MicrophoneRecorder, SystemLoopbackRecorder
+from .combined import CombinedRecorder
 from .transcriber import TranscriptionWorker
 from .live import LiveTranscriptionWorker
 from .reports import draft_local, draft_ai, stamp
@@ -66,7 +69,7 @@ class ReportWorker(QThread):
             self.failed.emit(f'{type(exc).__name__}: {exc}')
 
 
-class MainWindow(StorageActions, QMainWindow):
+class MainWindow(TranscriptActions, RecordingActions, StorageActions, QMainWindow):
     def __init__(self):
         super().__init__()
         self.store = Store()
@@ -85,6 +88,7 @@ class MainWindow(StorageActions, QMainWindow):
         self._notes_notice = ''
         self._notes_details = ''
         self._save_error = ''
+        self._stop_worker = None
         self._storage_worker = None
         self._storage_restoring = False
         self.recorder = MicrophoneRecorder()
@@ -388,6 +392,9 @@ class MainWindow(StorageActions, QMainWindow):
         self.search_transcript.setMaximumWidth(240)
         self.search_transcript.textChanged.connect(self.filter_transcript)
         transcript_head.addWidget(self.search_transcript)
+        self.speakers_btn = self._button('Speakers', 'Plain')
+        self.speakers_btn.clicked.connect(self.rename_speakers)
+        transcript_head.addWidget(self.speakers_btn)
         t_layout.addLayout(transcript_head)
         self.table = QTableWidget(0, 3)
         self.table.setToolTip('Double-click words or speakers to edit. Click a timestamp to play source audio.')
@@ -498,7 +505,20 @@ class MainWindow(StorageActions, QMainWindow):
         work.addWidget(self.tabs, 1)
 
         bottom = QHBoxLayout()
-        bottom.addWidget(self._label('Microphone / PC audio', 'Hint'))
+        self.capture_mode = QComboBox()
+        for label, mode in [('Microphone', 'microphone'), ('Computer audio', 'system'), ('Both sources', 'combined')]:
+            self.capture_mode.addItem(label, mode)
+        self.capture_mode.setAccessibleName('Recording source mode')
+        self.capture_mode.setCurrentIndex(max(0, self.capture_mode.findData(str(self.settings.value('capture_mode', 'microphone')))))
+        self.capture_mode.currentIndexChanged.connect(lambda _: self.settings.setValue('capture_mode', self.capture_mode.currentData()))
+        bottom.addWidget(self.capture_mode)
+        self.system_combo = QComboBox()
+        self.system_combo.addItem('Default playback device', None)
+        self.system_combo.setAccessibleName('Computer audio output device')
+        source_row = QHBoxLayout()
+        source_row.addWidget(self._label('Computer audio device', 'SettingLabel'))
+        source_row.addWidget(self.system_combo, 1)
+        settings_layout.insertLayout(2, source_row)
         bottom.addStretch(1)
         self.mic_combo = QComboBox()
         self.mic_combo.setMinimumWidth(180)
@@ -578,6 +598,7 @@ class MainWindow(StorageActions, QMainWindow):
         if os.name == 'nt':
             try:
                 for device_id, name in SystemLoopbackRecorder.devices():
+                    self.system_combo.addItem(name, device_id)
                     self.mic_combo.addItem('PC audio: ' + name, 'loopback:' + device_id)
             except Exception:
                 pass
@@ -680,7 +701,8 @@ class MainWindow(StorageActions, QMainWindow):
         reporting = bool(self._report_worker and self._report_worker.isRunning())
         recording = self.record_timer.isActive()
         storage_busy = bool(self._storage_worker and self._storage_worker.isRunning())
-        busy = transcribing or reporting or live_working or storage_busy
+        stopping = bool(self._stop_worker and self._stop_worker.isRunning())
+        busy = transcribing or reporting or live_working or storage_busy or stopping
         has_words = bool(self.current_session and self.current_session.get('segments'))
         self.transcript_stack.setCurrentIndex(0 if self.table.rowCount() else 1)
         if recording or live_working:
@@ -692,11 +714,13 @@ class MainWindow(StorageActions, QMainWindow):
         else:
             self.empty_title.setText('Every meeting, clearly captured.')
             self.empty_hint.setText('Record a conversation, add an audio or video file, or paste notes to get started.')
-        for control in (self.mic_combo, self.live_checkbox, self.live_model_combo, self.language_combo):
+        for control in (self.capture_mode, self.system_combo, self.mic_combo, self.live_checkbox, self.live_model_combo, self.language_combo):
             control.setEnabled(not recording and not live_working)
         self.transcribe_btn.setEnabled((has_audio and not reporting and not recording and not live_working) or transcribing)
         if not transcribing:
             self.transcribe_btn.setText('Improve transcript' if has_words and has_audio else 'Create transcript')
+        self.record_btn.setEnabled(not stopping and not storage_busy)
+        self.speakers_btn.setEnabled(has_words and not busy and not recording)
         self.report_btn.setEnabled(has_words and not busy and not recording)
         self.export_btn.setEnabled(bool(has_words or any(edit.toPlainText().strip() for edit in self.doc_edits.values())) and not recording and not busy)
         for edit in self.doc_edits.values():
@@ -732,7 +756,8 @@ class MainWindow(StorageActions, QMainWindow):
             control.setEnabled(not busy and not recording)
 
     def _is_busy(self):
-        return bool((self._storage_worker and self._storage_worker.isRunning()) or
+        return bool((self._stop_worker and self._stop_worker.isRunning()) or
+                    (self._storage_worker and self._storage_worker.isRunning()) or
                     (self._worker and self._worker.isRunning()) or
                     (self._report_worker and self._report_worker.isRunning()) or
                     (self._live_worker and self._live_worker.isRunning()))
@@ -807,173 +832,6 @@ class MainWindow(StorageActions, QMainWindow):
         self.search_library.clear()
         self.reload_library(select_id=session_id)
 
-    def _live_option_changed(self, enabled):
-        self.settings.setValue('live_captions', enabled)
-        if not self.record_timer.isActive():
-            self.record_btn.setText('Record meeting')
-
-    def toggle_record(self):
-        if self.record_timer.isActive():
-            try:
-                self.persist()
-                path = self.recorder.stop()
-                self.record_timer.stop()
-                self.record_btn.setText('Record meeting')
-                self.record_btn.setObjectName('Record')
-                self.record_btn.style().unpolish(self.record_btn)
-                self.record_btn.style().polish(self.record_btn)
-                if self.session_id:
-                    self.store.update(self.session_id, audio_path=str(path),
-                                      duration=self.recorder.elapsed, recording_state='complete', audio_owned=True)
-                    self.load_session(self.session_id)
-                if self._live_worker and self._live_worker.isRunning():
-                    self._live_worker.stop()
-                    self.status_label.setText('Recording saved · finishing the last words…')
-                    self.caption_status.setText('Recording saved · finishing the last words…')
-                else:
-                    self.status_label.setText(f'Recording saved · {stamp(self.recorder.elapsed)} · Ready to transcribe')
-                if self.recorder.live_dropped:
-                    QMessageBox.warning(self, 'Some words could not keep up',
-                        'Your full recording is safe. Choose Improve transcript to fill in any words that were missed while recording.')
-                if self.recorder.error or self.recorder.elapsed < 0.2:
-                    self._show_error('Check your recording',
-                                     'Some sound may be missing. Play the recording to check it, and make sure the right microphone is selected.',
-                                     self.recorder.error or 'There is almost no sound in this recording.')
-            except Exception as exc:
-                self._show_error('Could not finish recording',
-                                 'Please check your saved recording before starting another meeting.', exc)
-            finally:
-                self.record_timer.stop()
-                if self._live_worker and self._live_worker.isRunning():
-                    self._live_worker.stop()
-                self.record_btn.setText('Record meeting')
-                self.record_btn.setObjectName('Record')
-                self.record_btn.style().unpolish(self.record_btn)
-                self.record_btn.style().polish(self.record_btn)
-                self.update_actions()
-            return
-        if self._is_busy():
-            QMessageBox.information(self, 'Busy', 'Complete the current task before recording.')
-            return
-        if not self.session_id and not self.new_session():
-            return
-        # A new audio capture must never silently mismatch an old transcript.
-        if self.current_session and (self.current_session.get('audio_path') or self.current_session.get('segments')):
-            if not self.new_session():
-                return
-            self.title_edit.setText('Meeting · ' + datetime.now().strftime('%d %b %Y %H:%M'))
-            self.persist()
-        if not self.persist():
-            return
-        path = self.store.recordings / f'{uuid.uuid4().hex}.wav'
-        live_enabled = self.live_checkbox.isChecked()
-        self._live_failed_message = None
-        try:
-            selected_device = self.mic_combo.currentData()
-            if isinstance(selected_device, str) and selected_device.startswith('loopback:'):
-                self.recorder = SystemLoopbackRecorder()
-                device = selected_device[len('loopback:'):]
-            else:
-                self.recorder = MicrophoneRecorder()
-                device = selected_device
-            live_queue = queue.Queue(maxsize=3500) if live_enabled else None
-            self.recorder.live_queue = live_queue
-            self.recorder.start(path, device)
-            self.store.update(self.session_id, audio_path=str(path), duration=0,
-                              model='live' if live_enabled else '', audio_owned=True, recording_state='active')
-            self.current_session = self.store.get(self.session_id)
-            self.audio_name.setText('Recording this meeting…')
-            self.playback_controls.hide()
-            if live_enabled:
-                model = self.live_model_combo.currentData()
-                self._live_session_id = self.session_id
-                self._live_failed_message = None
-                self.caption_status.setText('Getting ready to listen · first use needs a download. Your recording is safe.')
-                self.search_transcript.clear()
-                self._live_worker = LiveTranscriptionWorker(
-                    live_queue, model, self.language_combo.currentData(), self.store.models, self)
-                self._live_worker.status.connect(self._live_status)
-                self._live_worker.segment_batch.connect(self._live_segments)
-                self._live_worker.failed.connect(self._live_failed)
-                self._live_worker.finished.connect(self._live_finished)
-                self._live_worker.start()
-                self.tabs.setCurrentIndex(0)
-            else:
-                self.caption_status.setText('Recording only · enable live transcription before your next recording for captions')
-            self.record_btn.setText('Stop recording')
-            self.record_btn.setObjectName('Recording')
-            self.record_btn.style().unpolish(self.record_btn)
-            self.record_btn.style().polish(self.record_btn)
-            self.status_label.setText('Recording · getting ready to show your words…' if live_enabled
-                                      else 'Recording…')
-            self.record_timer.start()
-            self.update_actions()
-        except Exception as exc:
-            if self.recorder.active:
-                self.recorder.stop()
-            self._show_error('Microphone unavailable',
-                'We could not start recording. Choose another microphone below, or allow microphone access in Windows Settings.', exc)
-
-    def _refresh_recording(self):
-        duration = stamp(self.recorder.elapsed)
-        bars = int(min(1, self.recorder.level * 7) * 12)
-        caption = ' · LIVE' if self._live_worker and self._live_worker.isRunning() else ''
-        if self._live_worker and self._live_worker.isRunning():
-            behind = max(0, int(self.recorder.elapsed - self._live_worker.processed_seconds))
-            caption += f' · ~{behind}s pending' if behind >= 10 else ''
-        if self._live_failed_message:
-            caption = ' · WORDS UNAVAILABLE · recording continues'
-        elif self.recorder.elapsed >= 3 and self.recorder.level < 0.0001:
-            caption += ' · No sound detected · check your microphone'
-        self.status_label.setText(f'● Recording {duration}{caption}    {"▮" * bars}{"▯" * (12 - bars)}')
-        if not self.recorder.active:
-            # An audio backend may fail asynchronously (e.g., unplugged loopback).
-            self.toggle_record()
-
-    def _live_status(self, message):
-        self.caption_status.setText(message)
-        if not self.record_timer.isActive():
-            self.status_label.setText(message)
-        self.statusBar().showMessage(message, 6000)
-
-    def _live_segments(self, new_segments):
-        if self._live_session_id != self.session_id or not new_segments:
-            return
-        # No reload while recording, so the user's current focus and edits survive.
-        self.table.blockSignals(True)
-        for part in new_segments:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            time_cell = QTableWidgetItem(stamp(part.get('start', 0)))
-            time_cell.setFlags(time_cell.flags() & ~Qt.ItemIsEditable)
-            time_cell.setData(Qt.UserRole, float(part.get('start', 0)))
-            time_cell.setData(Qt.UserRole + 1, float(part.get('end', 0)))
-            self.table.setItem(row, 0, time_cell)
-            self.table.setItem(row, 1, QTableWidgetItem(part.get('speaker') or 'Speaker'))
-            self.table.setItem(row, 2, QTableWidgetItem(part.get('text') or ''))
-        self.table.blockSignals(False)
-        self.transcript_stack.setCurrentIndex(0)
-        for row in range(self.table.rowCount() - len(new_segments), self.table.rowCount()):
-            self.table.setRowHidden(row, False)
-        self.table.scrollToBottom()
-        self.persist()
-
-    def _live_failed(self, message):
-        self._live_failed_message = message
-        self.caption_status.setText('Words cannot be shown right now. Your recording is safe; create a transcript when you finish.')
-        self.status_label.setText('Recording continues · words are temporarily unavailable')
-
-    def _live_finished(self):
-        if not self.record_timer.isActive():
-            self.persist()
-            count = self.table.rowCount()
-            message = ('Your recording is safe. Click Create transcript to recover the words.' if self._live_failed_message
-                       else '✓ Your words are saved. Choose Improve transcript for a more accurate version.' if count
-                       else 'No words recognized. Check your microphone and language, or try Create transcript.')
-            self.status_label.setText(message)
-            self.caption_status.setText(message)
-        self.update_actions()
-
     def transcribe(self):
         if self._worker and self._worker.isRunning():
             self._worker.cancel()
@@ -983,12 +841,6 @@ class MainWindow(StorageActions, QMainWindow):
             return
         if not self.current_session or not self.current_session.get('audio_path'):
             return
-        if self.current_session.get('segments'):
-            reply = QMessageBox.question(self, 'Replace transcript?',
-                    'Transcribing again will replace the current transcript and speaker labels. Continue?',
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply != QMessageBox.Yes:
-                return
         if not self.persist():
             return
         self._transcription_session_id = self.session_id
@@ -1014,17 +866,6 @@ class MainWindow(StorageActions, QMainWindow):
         if self.progress.maximum() == 0:
             self.progress.setRange(0, 100)
         self.progress.setValue(value)
-
-    def _transcribed(self, result):
-        self.progress.hide()
-        target_id = self._transcription_session_id
-        self.store.update(target_id, **result)
-        if self.session_id == target_id:
-            self.load_session(target_id)
-        self.reload_library(select_id=target_id)
-        self.tabs.setCurrentIndex(0)
-        self.status_label.setText(f'✓ Your transcript is ready. Edit anything or create notes.')
-        self.statusBar().showMessage('Your words are saved on this PC. Create notes when you are ready.', 10000)
 
     def _transcription_finished(self):
         self.progress.hide()

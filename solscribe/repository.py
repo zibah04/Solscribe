@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import sqlite3
@@ -14,7 +15,7 @@ from .filesystem import contained_file, write_json
 log = logging.getLogger(__name__)
 FIELDS = {'title', 'audio_path', 'duration', 'language', 'model', 'segments',
           'meeting_date', 'attendees', 'location', 'chair', 'agenda', 'summary', 'minutes',
-          'memo', 'actions', 'notes', 'updated_at', 'action_items', 'transcript_history', 'recording_state'}
+          'memo', 'actions', 'notes', 'updated_at', 'action_items', 'transcript_history', 'recording_state', 'recording_pid'}
 JSON_FIELDS = {'segments': [], 'action_items': [], 'transcript_history': []}
 
 
@@ -49,7 +50,7 @@ class Store:
                     raise sqlite3.DatabaseError('Meeting database needs recovery from a backup')
                 version = connection.execute('PRAGMA user_version').fetchone()[0]
             backups = sorted(self.backups.glob('auto-*.db'))
-            if version < 2 or not backups or datetime.fromtimestamp(backups[-1].stat().st_mtime).date() != datetime.now().date():
+            if version < 3 or not backups or datetime.fromtimestamp(backups[-1].stat().st_mtime).date() != datetime.now().date():
                 self.backup_database(self.backups / f'auto-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}.db')
                 for old in sorted(self.backups.glob('auto-*.db'))[:-5]:
                     old.unlink()
@@ -65,7 +66,7 @@ class Store:
             columns = {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}
             for name, definition in {'summary': "TEXT DEFAULT ''", 'deleted_at': "TEXT DEFAULT ''",
                                      'action_items': "TEXT DEFAULT '[]'", 'transcript_history': "TEXT DEFAULT '[]'",
-                                     'recording_state': "TEXT DEFAULT ''"}.items():
+                                     'recording_state': "TEXT DEFAULT ''", 'recording_pid': 'INTEGER DEFAULT 0'}.items():
                 if name not in columns:
                     conn.execute(f'ALTER TABLE sessions ADD COLUMN {name} {definition}')
             conn.execute('''CREATE TABLE IF NOT EXISTS recordings (
@@ -75,6 +76,9 @@ class Store:
                 session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
                 recording_id TEXT NOT NULL REFERENCES recordings(id), role TEXT NOT NULL,
                 PRIMARY KEY(session_id, role))''')
+            link_columns = {row['name'] for row in conn.execute('PRAGMA table_info(session_recordings)')}
+            if 'offset_seconds' not in link_columns:
+                conn.execute('ALTER TABLE session_recordings ADD COLUMN offset_seconds REAL DEFAULT 0')
             # Legacy files have unknown provenance, even inside the recordings
             # folder. Never promote them to owned based only on their location.
             for row in conn.execute("SELECT id, audio_path FROM sessions WHERE audio_path != ''").fetchall():
@@ -83,7 +87,7 @@ class Store:
                     self._link(conn, row['id'], row['audio_path'], 'main', False, legacy=True)
             conn.execute('CREATE INDEX IF NOT EXISTS ix_sessions_updated ON sessions(updated_at DESC)')
             conn.execute('CREATE INDEX IF NOT EXISTS ix_recording_refs ON session_recordings(recording_id)')
-            conn.execute('PRAGMA user_version=2')
+            conn.execute('PRAGMA user_version=3')
         self.recover_drafts()
         self.recover_recordings()
 
@@ -116,7 +120,9 @@ class Store:
                 result[field] = default.copy()
         return result
 
-    def _link(self, conn, sid: str, path: str, role: str, owned: bool, *, legacy=False) -> str:
+    def _link(self, conn, sid: str, path: str, role: str, owned: bool, *, legacy=False, offset=0.0) -> str:
+        if not math.isfinite(float(offset)) or float(offset) < 0:
+            raise ValueError('Invalid source-track offset')
         canonical = os.path.normcase(str(Path(path).resolve()))
         if owned and not contained_file(Path(canonical), self.recordings):
             raise ValueError('Owned audio must be inside the managed recordings folder')
@@ -133,7 +139,7 @@ class Store:
             # Imported/legacy files never acquire ownership implicitly.
             if owned and not row['owned']:
                 raise ValueError('Cannot take ownership of an imported or legacy recording')
-        conn.execute('INSERT OR REPLACE INTO session_recordings VALUES(?,?,?)', (sid, rid, role))
+        conn.execute('INSERT OR REPLACE INTO session_recordings(session_id,recording_id,role,offset_seconds) VALUES(?,?,?,?)', (sid, rid, role, float(offset)))
         return rid
 
     def create(self, title='Untitled session', audio_path='', *, audio_owned=False):
@@ -184,7 +190,8 @@ class Store:
                 for role, path in source_tracks.items():
                     if role not in ('microphone', 'system'):
                         raise ValueError('Unknown recording track')
-                    self._link(conn, session_id, path, role, audio_owned)
+                    actual_path = path['path'] if isinstance(path, dict) else path
+                    self._link(conn, session_id, actual_path, role, audio_owned, offset=path.get('offset', 0) if isinstance(path, dict) else 0)
             assignments = ', '.join(f'{field}=?' for field in encoded)
             conn.execute(f'UPDATE sessions SET {assignments} WHERE id=?', (*encoded.values(), session_id))
         draft.unlink(missing_ok=True)
@@ -217,7 +224,7 @@ class Store:
 
     def recording_assets(self, session_id: str) -> list[dict]:
         with self.connect(write=False) as conn:
-            return [dict(row) for row in conn.execute('SELECT r.*,s.role FROM recordings r JOIN session_recordings s ON r.id=s.recording_id WHERE s.session_id=?', (session_id,))]
+            return [dict(row) for row in conn.execute('SELECT r.*,s.role,s.offset_seconds FROM recordings r JOIN session_recordings s ON r.id=s.recording_id WHERE s.session_id=?', (session_id,))]
 
     def purge_recording(self, recording_id: str, *, confirm=False):
         if not confirm:
@@ -270,6 +277,7 @@ class Store:
 
     def recover_recordings(self):
         from .recovery import recover_pcm_wave
+        from .processes import process_alive
         with self.connect(write=False) as conn:
             pending = [row[0] for row in conn.execute("SELECT id FROM recordings WHERE state='purging'")]
         for recording_id in pending:
@@ -281,11 +289,15 @@ class Store:
             rows = conn.execute("SELECT DISTINCT r.* FROM recordings r JOIN session_recordings s ON r.id=s.recording_id JOIN sessions m ON m.id=s.session_id WHERE r.owned=1 AND m.recording_state='active'").fetchall()
         for row in rows:
             try:
+                with self.connect(write=False) as conn:
+                    owners = [item[0] for item in conn.execute("SELECT m.recording_pid FROM sessions m JOIN session_recordings s ON m.id=s.session_id WHERE s.recording_id=? AND m.recording_state='active'", (row['id'],))]
+                if any(process_alive(int(pid or 0)) for pid in owners):
+                    continue
                 if not contained_file(Path(row['path']), self.recordings):
                     continue
                 info = recover_pcm_wave(Path(row['path']))
                 with self.connect() as conn:
-                    conn.execute("UPDATE sessions SET recording_state='recovered',duration=? WHERE id IN (SELECT session_id FROM session_recordings WHERE recording_id=? AND role='main')", (info['duration'], row['id']))
+                    conn.execute("UPDATE sessions SET recording_state='recovered',recording_pid=0,duration=? WHERE id IN (SELECT session_id FROM session_recordings WHERE recording_id=? AND role='main')", (info['duration'], row['id']))
                 self.recovery_notices.append('Recovered audio written before an interrupted recording.')
             except (OSError, ValueError):
                 log.warning('An interrupted recording could not be repaired; original retained')

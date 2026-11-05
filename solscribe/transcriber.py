@@ -4,6 +4,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
+from .speech_resources import cpu_threads, release_model
 
 
 class TranscriptionWorker(QThread):
@@ -24,13 +25,16 @@ class TranscriptionWorker(QThread):
         self._cancel.set()
 
     def run(self):
+        model = None
         try:
+            if self._cancel.is_set():
+                return
             if not Path(self.audio_path).is_file():
                 raise FileNotFoundError('Audio file is missing. Please import it again.')
             self.status.emit('Getting ready to read your recording · first use needs a download…')
             from faster_whisper import WhisperModel
             model = WhisperModel(self.model_name, device='cpu', compute_type='int8',
-                                 download_root=self.models_folder, cpu_threads=4)
+                                 download_root=self.models_folder, cpu_threads=cpu_threads())
             if self._cancel.is_set():
                 return
             self.status.emit('Turning your recording into text…')
@@ -55,3 +59,6 @@ class TranscriptionWorker(QThread):
                               'language': info.language or '', 'model': self.model_name})
         except Exception as exc:
             self.failed.emit(f'{type(exc).__name__}: {exc}')
+        finally:
+            if model is not None:
+                release_model(model)
