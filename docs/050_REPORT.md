@@ -1,6 +1,6 @@
 # 0.5.0 lecture-mode verification
 
-Status: final Windows and Linux verification passed. The installer (113,083,533 bytes), portable ZIP (170,389,328 bytes) and seven supporting files are checksum-verified in the [private beta draft](https://github.com/zibah04/Solscribe/releases/tag/untagged-7b5815763aea643f22cd). [Private staging run 42058974658](https://github.com/zibah04/Solscribe/actions/runs/42058974658) passed. No public 0.5.0 release has been published or main merged.
+Status: final Windows and Linux verification passed. The installer (113,083,533 bytes), portable ZIP (170,389,328 bytes) and seven supporting files are checksum-verified in the [public beta release](https://github.com/zibah04/Solscribe/releases/tag/v0.5.0-beta.1). [Private staging run 42058974658](https://github.com/zibah04/Solscribe/actions/runs/42058974658) passed. The owner explicitly approved public publication on 5 November 2026; the tested release is now public. Main has not been merged.
 
 Source: `53d08ba08860e09a4878ff31680e3d62297c0d76` on `codex/solscribe-050-lecture-mode`.
 
@@ -37,4 +37,6 @@ Raw Linux XML, Windows annotations/metrics/checksums and both-theme screenshots 
 
 See [LECTURE_MODE.md](LECTURE_MODE.md) for usage and limits. Real lecture accuracy, physical audio, 8 GB target hardware, actual Ollama quality and assistive technology are not certified by synthetic/offscreen tests. Quick category detection is English based, selected excerpts are limited and AI wording still needs review. This is an unsigned beta pending user acceptance.
 
-The user's engineering brief explicitly requires approval before public publication or merging main. The published 0.4.0 download and earlier private 0.4.1 draft remain unchanged. A future public 0.5.0 direct link is not usable while its release remains private.
+The user approved publication of this exact tested beta on 5 November 2026. The public tag points to tested source `53d08ba08860e09a4878ff31680e3d62297c0d76`, with all nine verified assets retained. Anonymous installer download and portable HEAD requests returned HTTP 200 with the expected sizes; the fully downloaded installer matched its tested SHA256. The updater selects this release for an older beta and verifies that downloaded installer. See `validation/050/public-release.json`, `public-download-check.json` and `public-update-selection.json`.
+
+The previously published 0.4.0 download and earlier private 0.4.1 draft remain unchanged. Main merge still requires separate approval.

@@ -4,11 +4,11 @@ Private meeting and lecture recording, transcripts and useful notes for Windows 
 
 The 0.5.0 beta source includes verified in-app updates, an optional four-step first-use guide, and the `zibah@2026` footer from the validated 0.4.1 work. **Lecture** mode adds study notes, key concepts, explicit definitions and examples, editable revision cards with revealable answers, and timestamped original excerpts. Meeting documents and study notes are saved separately. See [lecture usage](docs/LECTURE_MODE.md), [update delivery](docs/UPDATES.md) and [0.5.0 verification](docs/050_REPORT.md).
 
-The public installer below remains 0.4.0 while 0.5.0 awaits public-release approval. Main has not been merged.
+The 0.5.0 beta is published with owner approval on 5 November 2026. The direct installer below includes lecture tools, updates and the guide. Main has not been merged.
 
 ## Get started
 
-[Download the Windows installer](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Setup-0.4.0.exe) (113 MB) and run it. No GitHub sign-in or ZIP extraction is needed. A [portable ZIP](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Portable-Windows.zip) (170 MB) is also available; extract and keep its whole `SolScribe` folder together. Python is bundled. [Release notes, checksums and build identity](https://github.com/zibah04/Solscribe/releases/tag/v0.4.0-beta.1) accompany the unsigned beta. These release downloads do not have the 30-day expiry of Actions artifacts.
+[Download the Windows installer](https://github.com/zibah04/Solscribe/releases/download/v0.5.0-beta.1/SolScribe-Setup-0.5.0.exe) (113 MB) and run it. No GitHub sign-in or ZIP extraction is needed. A [portable ZIP](https://github.com/zibah04/Solscribe/releases/download/v0.5.0-beta.1/SolScribe-Portable-Windows.zip) (170 MB) is also available; extract and keep its whole `SolScribe` folder together. Python is bundled. [Release notes, checksums and build identity](https://github.com/zibah04/Solscribe/releases/tag/v0.5.0-beta.1) accompany the unsigned beta. These release downloads do not have the 30-day expiry of Actions artifacts.
 
 1. Choose **Microphone**, **Computer audio**, or **Both sources** at the bottom. Choose the microphone there; the computer playback device is in Settings.
 2. Click **Record meeting**. With **Show words while I speak** enabled, captions arrive in roughly two-second audio batches plus model processing time. First use downloads a speech model. Your audio continues saving while it loads.
@@ -95,7 +95,7 @@ For reproducible measurements, run `python scripts/benchmark.py --output perform
 
 Optional Authenticode preparation uses `scripts/sign_windows.ps1`. A legitimate certificate and protected private key must already be provisioned in the runner's CurrentUser certificate store; set repository variable `WINDOWS_SIGNING_THUMBPRINT`. Configured signing failures fail the build. A future signing runner/service must protect that key; no secrets belong in source. Inno's generated uninstaller is not signed by this preparation.
 
-See [architecture](docs/ARCHITECTURE.md), [release notes](RELEASE_NOTES.md) and [engineering evidence](docs/ENGINEERING_REPORT.md). Changes are prepared on `codex/solscribe-040-remediation`; the functional `codex/windows-build-v0.2` history is preserved. Review and merge the PR before making `main` the release source. The [public beta download](https://github.com/zibah04/Solscribe/releases/tag/v0.4.0-beta.1) was published with explicit user approval on 5 November 2026. Main has not been merged.
+See [architecture](docs/ARCHITECTURE.md), [release notes](RELEASE_NOTES.md) and [engineering evidence](docs/ENGINEERING_REPORT.md). The latest changes are prepared in [PR #3](https://github.com/zibah04/Solscribe/pull/3) on `codex/solscribe-050-lecture-mode`; the functional `codex/windows-build-v0.2` history is preserved. Review and merge the PR before making `main` the release source. The [public beta download](https://github.com/zibah04/Solscribe/releases/tag/v0.5.0-beta.1) was published with explicit user approval on 5 November 2026. Main has not been merged.
 
 ## Troubleshooting
 
