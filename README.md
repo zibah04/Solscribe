@@ -2,6 +2,8 @@
 
 Private meeting recording, transcripts and useful notes for Windows 10/11 x64. SolScribe 0.4.0 is a **beta**: light and dark themes retain the familiar purple palette, with a simpler workspace that adapts to smaller displays.
 
+The validated 0.4.1 beta build adds verified in-app updates, an optional four-step first-use guide, and the `zibah@2026` footer. See [update delivery and setup](docs/UPDATES.md) and [0.4.1 verification](docs/041_REPORT.md). The published installer below remains 0.4.0 until the new beta is approved for public publication. Its Windows and Linux tests have passed.
+
 ## Get started
 
 [Download the Windows installer](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Setup-0.4.0.exe) (113 MB) and run it. No GitHub sign-in or ZIP extraction is needed. A [portable ZIP](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Portable-Windows.zip) (170 MB) is also available; extract and keep its whole `SolScribe` folder together. Python is bundled. [Release notes, checksums and build identity](https://github.com/zibah04/Solscribe/releases/tag/v0.4.0-beta.1) accompany the unsigned beta. These release downloads do not have the 30-day expiry of Actions artifacts.

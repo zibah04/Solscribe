@@ -1,0 +1,2 @@
+dee4251e56961892ba3cb97d66c48157e762c956a443571dcea7f1ce0103052d  SolScribe-Setup-0.4.1.exe
+44968b430fddba4ed3a588a67f70ff12d08a4daec3dbdcf342d7b29f9631d72a  SolScribe-Portable-Windows.zip
