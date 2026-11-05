@@ -6,13 +6,13 @@ import tempfile
 from pathlib import Path
 
 REPOSITORY = 'zibah04/Solscribe'
-RUN_ID = '42032772170'
-SOURCE = 'f1290dffb5aeffd204609d37959d862fbaebc802'
+RUN_ID = '42035906513'
+SOURCE = '4494747102eac8aee935f7e75191f5506b0394ce'
 RELEASE_ID = 435226602
 TAG = 'v0.4.1-beta.1'
 EXPECTED = {
-    'SolScribe-Setup-0.4.1.exe': '325eee3777266caf392e57158de24eabc2ac4f741c259405ba18a3ee13957ed8',
-    'SolScribe-Portable-Windows.zip': '614748cde0b2982994b731861d339b5689f4a71e24f36666eacb7df03c486bb6',
+    'SolScribe-Setup-0.4.1.exe': 'dee4251e56961892ba3cb97d66c48157e762c956a443571dcea7f1ce0103052d',
+    'SolScribe-Portable-Windows.zip': '44968b430fddba4ed3a588a67f70ff12d08a4daec3dbdcf342d7b29f9631d72a',
 }
 
 

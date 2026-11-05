@@ -11,7 +11,7 @@ operation. Public release publication still requires explicit user approval, as
 specified in the engineering brief. Main is not merged by this workflow.
 
 The 0.4.1 beta is now prepared in a private draft using the successful Windows
-run 42032772170. The previously approved 0.4.0 public release remains unchanged.
+run 42035906513. The previously approved 0.4.0 public release remains unchanged.
 After separate approval and publication, the new direct installer URL will be:
 
 `https://github.com/zibah04/Solscribe/releases/download/v0.4.1-beta.1/SolScribe-Setup-0.4.1.exe`
