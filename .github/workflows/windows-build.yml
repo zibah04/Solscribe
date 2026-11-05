@@ -118,22 +118,31 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_SCALE_FACTOR: '1.5'
         run: |
+          trap { Write-Output ("::error title=Installer validation::" + ($_.Exception.Message -replace '[\r\n]', ' ')); exit 1 }
           $env:LOCALAPPDATA = "$env:RUNNER_TEMP/SolScribe-test-profile"
           python scripts/check_install.py seed
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $installDir = "$env:RUNNER_TEMP/SolScribe-installed"
           foreach ($attempt in @(1, 2)) {
-            $setup = Start-Process 'Output/SolScribe-Setup-0.4.0.exe' -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$installDir") -PassThru
+            $setup = Start-Process 'Output/SolScribe-Setup-0.4.0.exe' -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$installDir", "/LOG=$pwd/install-$attempt.log") -PassThru
             if (-not $setup.WaitForExit(120000)) { $setup.Kill(); throw 'Installer timed out' }
             if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
+            Write-Output "::notice title=Installer validation::Install attempt $attempt completed"
             $app = Start-Process "$installDir/SolScribe.exe" -ArgumentList '--smoke-test' -PassThru
             if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Installed app timed out' }
             if ($app.ExitCode -ne 0) { throw "Installed app failed: $($app.ExitCode)" }
             python scripts/check_install.py verify
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $remove = Start-Process "$installDir/unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -PassThru
+            Write-Output "::notice title=Installer validation::Installed app and existing data verified, attempt $attempt"
+            $remove = Start-Process "$installDir/unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$pwd/uninstall-$attempt.log") -PassThru
             if (-not $remove.WaitForExit(60000)) { $remove.Kill(); throw 'Uninstaller timed out' }
             if ($remove.ExitCode -ne 0) { throw "Uninstaller failed: $($remove.ExitCode)" }
+            # Inno may finish in a temporary child process; wait for its files to
+            # be removed before immediately testing reinstallation.
+            $deadline = (Get-Date).AddSeconds(30)
+            while ((Test-Path "$installDir/SolScribe.exe") -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
+            if (Test-Path "$installDir/SolScribe.exe") { throw 'Uninstaller did not finish removing the application' }
+            Write-Output "::notice title=Installer validation::Application removed, attempt $attempt"
             python scripts/check_install.py verify
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
@@ -156,6 +165,8 @@ jobs:
           path: |
             windows-tests.xml
             pytest-console.log
+            install-*.log
+            uninstall-*.log
             layout-*.xml
             performance-windows.json
             speech-*-metrics.json
