@@ -1,5 +1,7 @@
 """Shared colors for the desktop, editors and dialogs."""
 from string import Template
+from pathlib import Path
+import sys
 from PySide6.QtGui import QColor, QPalette
 
 THEMES = {
@@ -48,7 +50,9 @@ QPushButton#Recording { background: #AE3157; color: white; border-color: #AE3157
 QPushButton#Plain { background: transparent; color: $ink; }
 QPushButton#Plain:hover { background: $hover; }
 QCheckBox { color: $ink; spacing: 8px; }
-QCheckBox::indicator { width: 17px; height: 17px; }
+QCheckBox::indicator { width: 17px; height: 17px; border: 1px solid $muted; border-radius: 3px; background: $field; }
+QCheckBox::indicator:checked { background: $accent; border-color: $accent; image: url("$check_icon"); }
+QCheckBox::indicator:disabled { border-color: $border; background: $disabled; }
 QListWidget { background: transparent; border: none; outline: none; padding: 2px; }
 QListWidget::item { color: $ink; border-radius: 8px; padding: 10px; margin: 2px 0; }
 QListWidget::item:hover { background: $hover; }
@@ -80,7 +84,8 @@ QToolTip { color: $ink; background: $panel; border: 1px solid $border; padding: 
 
 
 def stylesheet(name):
-    return _STYLE.substitute(THEMES.get(name, THEMES['dark']))
+    root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
+    return _STYLE.substitute(THEMES.get(name, THEMES['dark']), check_icon=(root / 'assets' / 'check.png').as_posix())
 
 
 def palette(name):

@@ -1,19 +1,21 @@
-SOLSCRIBE 0.4.0 BETA
+SOLSCRIBE 0.4.1 BETA
 Clear words. Useful notes. Saved on your PC.
 
 GET STARTED
 1. Close any older SolScribe window. Back up existing work before upgrading.
-2. Run SolScribe-Setup-0.4.0.exe, or extract the portable ZIP and open
+2. Run SolScribe-Setup-0.4.1.exe, or extract the portable ZIP and open
    SolScribe.exe inside its whole folder. No separate Python is needed.
-3. Choose Microphone, Computer audio or Both sources at the bottom.
+3. The first-use guide helps with appearance, inputs and basic usage.
+   You can skip it or reopen it from Guide in the footer or Settings.
+4. Choose Microphone, Computer audio or Both sources at the bottom.
    Choose your microphone there; the playback output is in Settings.
-4. Click Record meeting. Keep "Show words while I speak" checked for captions.
+5. Click Record meeting. Keep "Show words while I speak" checked for captions.
    First use may download a speech model. Wait for Listening.
    Words appear in short batches plus processing time, not word by word.
-5. Click Stop recording. Wait for saving and final captions to finish.
-6. Review words and speaker names. Improve transcript lets you compare a
+6. Click Stop recording. Wait for saving and final captions to finish.
+7. Review words and speaker names. Improve transcript lets you compare a
    new draft before replacing your edits. Existing notes remain saved.
-7. Click Create notes, review and edit the draft, then Save a copy.
+8. Click Create notes, review and edit the draft, then Save a copy.
 
 ALREADY HAVE A RECORDING OR TEXT?
 Add a recording, then Create transcript. Paste text uses existing words.
@@ -40,9 +42,15 @@ This is a beta. Review recognized words, names and notes before sharing.
 Physical audio devices and 8 GB laptop performance need target-device checks.
 Combined recording keeps both original tracks if you need to inspect a mix.
 Check SIGNING_STATUS.txt: no certificate is supplied and builds may be unsigned.
-Keep Windows security protections enabled. Automatic updates are not included.
+Keep Windows security protections enabled. Updates is in the footer and Settings.
+It checks your version, downloads a verified installer and lets you choose Install
+and close. Meetings are saved and a database backup is made first. Nothing installs
+silently. Optional startup checks can be enabled in the guide or Settings.
+Users on 0.4.0 need to install this version once to enable in-app updates.
 Read RELEASE_NOTES.md and the repository Windows acceptance checklist.
 
 DEVELOPERS
 Use Python 3.11 x64 with run_windows.bat or build_windows.bat.
 README.md contains setup, architecture and validation instructions.
+
+Created by zibah@2026

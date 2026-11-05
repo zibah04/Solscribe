@@ -11,7 +11,7 @@ if sys.platform.startswith('linux'):
 
 import numpy as np
 import pytest
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, QCoreApplication, QEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -21,7 +21,10 @@ from solscribe.storage import Store
 
 @pytest.fixture(scope='session')
 def app():
-    return QApplication.instance() or QApplication([])
+    value = QApplication.instance() or QApplication([])
+    if value.style().objectName().lower() != 'fusion':
+        value.setStyle('Fusion')
+    return value
 
 
 def until(predicate, seconds=5):
@@ -56,6 +59,9 @@ def window(app, tmp_path, monkeypatch):
         w._live_worker.wait(5000)
     app.processEvents()
     w.close()
+    w.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    app.processEvents()
     assert not unexpected_errors, unexpected_errors
 
 

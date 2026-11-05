@@ -14,7 +14,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements-build.txt
 if errorlevel 1 goto :fail
-".venv\Scripts\python.exe" -m PyInstaller --clean --noconfirm --onedir --windowed --name SolScribe --icon "assets\solscribe.ico" --version-file "assets\version_info.txt" --add-data "assets\solscribe.ico;assets" --add-data "assets\solscribe.png;assets" --add-data "LICENSE;." --add-data "START_HERE.txt;." --collect-all faster_whisper --collect-all ctranslate2 --collect-all tokenizers --collect-all av --collect-all sounddevice --collect-all soundcard app.py
+".venv\Scripts\python.exe" -m PyInstaller --clean --noconfirm --onedir --windowed --name SolScribe --icon "assets\solscribe.ico" --version-file "assets\version_info.txt" --add-data "assets\solscribe.ico;assets" --add-data "assets\solscribe.png;assets" --add-data "assets\check.png;assets" --add-data "LICENSE;." --add-data "START_HERE.txt;." --collect-all faster_whisper --collect-all ctranslate2 --collect-all tokenizers --collect-all av --collect-all sounddevice --collect-all soundcard app.py
 if errorlevel 1 goto :fail
 echo.
 echo BUILD SUCCESSFUL: dist\SolScribe\SolScribe.exe

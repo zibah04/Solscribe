@@ -5,7 +5,7 @@ from pathlib import Path
 from run_tests import annotation
 
 lines = ['# SolScribe build evidence', '', 'Measurements use synthetic test data. Physical audio acceptance remains separate.', '']
-for name in ('performance-windows.json', 'speech-source-metrics.json', 'speech-packaged-metrics.json'):
+for name in ('performance-windows.json', 'speech-source-metrics.json', 'speech-packaged-metrics.json', 'update-source-metrics.json', 'update-packaged-metrics.json'):
     path = Path(name)
     if path.is_file():
         value = json.loads(path.read_text(encoding='utf-8'))

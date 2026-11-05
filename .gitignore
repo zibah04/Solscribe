@@ -9,3 +9,7 @@ Output/
 *.db
 .smoke-models/
 live-smoke.wav
+
+/update-*-metrics.json
+/speech-*-metrics.json
+/performance*.json

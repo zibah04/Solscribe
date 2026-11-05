@@ -3,7 +3,7 @@ name: Build SolScribe for Windows
 on:
   workflow_dispatch:
   push:
-    branches: [main, master, codex/windows-build-v0.2, codex/solscribe-040-remediation]
+    branches: [main, master, codex/windows-build-v0.2, codex/solscribe-040-remediation, codex/solscribe-041-updates-guide]
     paths:
       - 'app.py'
       - 'solscribe/**'
@@ -31,6 +31,9 @@ jobs:
         with:
           python-version: '3.11'
           architecture: 'x64'
+      - name: Validate release metadata
+        shell: pwsh
+        run: python scripts/release_version.py
       - name: Install and validate dependencies, run regressions
         shell: pwsh
         env:
@@ -74,6 +77,9 @@ jobs:
           $voice.Dispose()
           python scripts/smoke_live.py live-smoke.wav
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real public update check and verified download
+        shell: pwsh
+        run: python scripts/smoke_updates.py
       - name: Build portable desktop executable
         shell: cmd
         run: build_windows.bat
@@ -93,6 +99,10 @@ jobs:
           if (-not $speech.WaitForExit(240000)) { $speech.Kill(); throw 'Packaged recognizer timed out' }
           if ($speech.ExitCode -ne 0) { throw "Packaged recognizer failed: $($speech.ExitCode)" }
           Get-Content speech-packaged-metrics.json
+          $update = Start-Process 'dist/SolScribe/SolScribe.exe' -ArgumentList '--update-smoke' -PassThru
+          if (-not $update.WaitForExit(240000)) { $update.Kill(); throw 'Packaged updater timed out' }
+          if ($update.ExitCode -ne 0) { throw "Packaged updater failed: $($update.ExitCode)" }
+          Get-Content update-packaged-metrics.json
       - name: Sign application when a legitimate certificate is provisioned
         shell: pwsh
         env:
@@ -111,7 +121,7 @@ jobs:
         shell: pwsh
         env:
           SOLSCRIBE_SIGNING_THUMBPRINT: ${{ vars.WINDOWS_SIGNING_THUMBPRINT }}
-        run: ./scripts/sign_windows.ps1 -Path Output/SolScribe-Setup-0.4.0.exe
+        run: ./scripts/sign_windows.ps1 -Path "Output/SolScribe-Setup-${env:SOLSCRIBE_VERSION}.exe"
       - name: Install, migrate, uninstall and reinstall with existing user data
         shell: pwsh
         env:
@@ -124,7 +134,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $installDir = "$env:RUNNER_TEMP/SolScribe-installed"
           foreach ($attempt in @(1, 2)) {
-            $setup = Start-Process 'Output/SolScribe-Setup-0.4.0.exe' -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$installDir", "/LOG=$pwd/install-$attempt.log") -PassThru
+            $setup = Start-Process "Output/SolScribe-Setup-${env:SOLSCRIBE_VERSION}.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$installDir", "/LOG=$pwd/install-$attempt.log") -PassThru
             if (-not $setup.WaitForExit(120000)) { $setup.Kill(); throw 'Installer timed out' }
             if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
             Write-Output "::notice title=Installer validation::Install attempt $attempt completed"
@@ -152,8 +162,8 @@ jobs:
         shell: pwsh
         run: |
           python -m pip freeze | Out-File -Encoding utf8 requirements-tested-windows.txt
-          @('SolScribe 0.4.0 beta', "Source: $env:GITHUB_SHA", "Build: $env:GITHUB_RUN_ID", (python --version)) | Out-File -Encoding utf8 BUILD_INFO.txt
-          Get-AuthenticodeSignature dist/SolScribe/SolScribe.exe, Output/SolScribe-Setup-0.4.0.exe | Select-Object Path, Status, StatusMessage | Format-List | Out-File -Encoding utf8 SIGNING_STATUS.txt
+          @("SolScribe ${env:SOLSCRIBE_RELEASE_TAG}", "Source: $env:GITHUB_SHA", "Build: $env:GITHUB_RUN_ID", (python --version)) | Out-File -Encoding utf8 BUILD_INFO.txt
+          Get-AuthenticodeSignature dist/SolScribe/SolScribe.exe, "Output/SolScribe-Setup-${env:SOLSCRIBE_VERSION}.exe" | Select-Object Path, Status, StatusMessage | Format-List | Out-File -Encoding utf8 SIGNING_STATUS.txt
           Get-ChildItem 'Output/SolScribe-Setup-*.exe', 'SolScribe-Portable-Windows.zip' | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } | Out-File -Encoding utf8 SHA256SUMS.txt
       - name: Summarize measurements for review
         if: always()
@@ -172,6 +182,7 @@ jobs:
             layout-*.xml
             performance-windows.json
             speech-*-metrics.json
+            update-*-metrics.json
             build/SolScribe/warn-SolScribe.txt
           retention-days: 30
       - name: Upload Windows installer and portable build
@@ -191,5 +202,6 @@ jobs:
             windows-tests.xml
             performance-windows.json
             speech-*-metrics.json
+            update-*-metrics.json
           if-no-files-found: error
           retention-days: 30

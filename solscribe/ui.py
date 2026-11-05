@@ -26,6 +26,7 @@ from .presentation.recording import RecordingActions
 from .presentation.transcripts import TranscriptActions
 from .presentation.actions import ActionRegister
 from .presentation.layout import WindowLayout
+from .presentation.help_updates import HelpUpdates
 from .repository import timestamp
 from .themes import THEMES, palette, stylesheet
 from . import __version__
@@ -87,7 +88,7 @@ class ReportWorker(QThread):
             self.client.release()
 
 
-class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActions, StorageActions, QMainWindow):
+class MainWindow(WindowLayout, HelpUpdates, ActionRegister, TranscriptActions, RecordingActions, StorageActions, QMainWindow):
     def __init__(self):
         super().__init__()
         self.store = Store()
@@ -113,6 +114,8 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
         self._stop_worker = None
         self._storage_worker = None
         self._storage_restoring = False
+        self._update_install_active = False
+        self._closing_for_update = False
         self.recorder = MicrophoneRecorder()
         self.setWindowTitle(f'SolScribe {__version__} · Meeting notes')
         self.setMinimumSize(620, 320)
@@ -139,10 +142,16 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
         self.record_timer.setInterval(180)
         self.record_timer.timeout.connect(self._refresh_recording)
         self._populate_microphones()
+        for combo, key in ((self.mic_combo, 'preferred_microphone'), (self.system_combo, 'preferred_playback')):
+            index = combo.findText(str(self.settings.value(key, '')))
+            if index >= 0:
+                combo.setCurrentIndex(index)
+            combo.currentTextChanged.connect(lambda text, key=key: self.settings.setValue(key, text))
         self.reload_library(select_id=str(self.settings.value('last_session', '')))
         if not self.session_id:
             self.new_session()
         self.statusBar().showMessage('; '.join(self.store.recovery_notices) or 'Your recordings and transcripts are stored locally.', 12000)
+        self.init_help_updates()
 
     def set_theme(self, name):
         self.theme_name = name if name in THEMES else 'dark'
@@ -310,9 +319,11 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
         live_working = self._live_active or bool(self._live_worker and self._live_worker.isRunning())
         reporting = self._report_active or bool(self._report_worker and self._report_worker.isRunning())
         recording = self.record_timer.isActive()
-        storage_busy = self._storage_active or bool(self._storage_worker and self._storage_worker.isRunning())
+        storage_busy = self._storage_active or self._update_install_active or bool(self._storage_worker and self._storage_worker.isRunning())
         stopping = self._stopping_active or bool(self._stop_worker and self._stop_worker.isRunning())
         busy = transcribing or reporting or live_working or storage_busy or stopping
+        self.guide_btn.setEnabled(not busy and not recording)
+        self.settings_guide_btn.setEnabled(not busy and not recording)
         has_words = bool(self.current_session and self.current_session.get('segments'))
         self.transcript_stack.setCurrentIndex(0 if self.table.rowCount() else 1)
         if recording or live_working:
@@ -377,7 +388,7 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
         self.compact_record.style().polish(self.compact_record)
 
     def _is_busy(self):
-        return bool(self._storage_active or self._stopping_active or self._report_active or self._live_active or (self._stop_worker and self._stop_worker.isRunning()) or
+        return bool(self._update_install_active or self._storage_active or self._stopping_active or self._report_active or self._live_active or (self._stop_worker and self._stop_worker.isRunning()) or
                     (self._storage_worker and self._storage_worker.isRunning()) or
                     (self._worker and self._worker.isRunning()) or
                     (self._report_worker and self._report_worker.isRunning()) or
@@ -717,6 +728,14 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
                 break
 
     def closeEvent(self, event):
+        if self._closing_for_update:
+            self._update_auto_timer.stop()
+            event.accept()
+            return
+        if self._update_install_active:
+            self.statusBar().showMessage('Preparing the update. SolScribe will close when it is ready.', 6000)
+            event.ignore()
+            return
         if self.record_timer.isActive():
             response = QMessageBox.question(self, 'Recording still active',
                                             'Stop the recording and close SolScribe?',
@@ -727,7 +746,7 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
             self.toggle_record()
         if self._is_busy():
             QMessageBox.information(self, 'Please finish current task',
-                                   'Audio transcription or report generation is still running. Close the app after it completes.')
+                                   'A task is still finishing. Please close the app after it completes.')
             event.ignore()
             return
         if not self.persist():
@@ -736,4 +755,10 @@ class MainWindow(WindowLayout, ActionRegister, TranscriptActions, RecordingActio
                              self._save_error)
             event.ignore()
             return
+        self._update_auto_timer.stop()
+        self._update_client.cancel()
+        if self._guide is not None:
+            self._guide.reject()
+        if self._update_dialog is not None:
+            self._update_dialog.reject()
         event.accept()

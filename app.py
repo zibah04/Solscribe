@@ -13,7 +13,8 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName('SolScribe')
     app.setOrganizationName('SolScribe')
-    app.setStyle('Fusion')
+    if app.style().objectName().lower() != 'fusion':
+        app.setStyle('Fusion')
     resources = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
     icon = resources / 'assets' / 'solscribe.ico'
     if icon.is_file():
@@ -24,6 +25,10 @@ def main():
         from solscribe.diagnostics import speech_smoke
         index = sys.argv.index('--speech-smoke')
         speech_smoke(sys.argv[index + 1], 'speech-packaged-metrics.json', '.smoke-models')
+        return 0
+    if '--update-smoke' in sys.argv:
+        from solscribe.update_diagnostics import update_smoke
+        update_smoke('update-packaged-metrics.json')
         return 0
     root = None
     try:
@@ -77,8 +82,18 @@ def main():
         if not window.table.isVisible() or window.table.viewport().height() < 160:
             raise RuntimeError('Transcript rows are not visible in the packaged application')
         window.set_theme(original_theme)
+        if window.credit_label.text() != 'zibah@2026':
+            raise RuntimeError('App footer is missing')
+        window.show_quick_guide()
+        for _ in range(3):
+            window._guide.next()
+            app.processEvents()
+        if window._guide.currentId() != 3:
+            raise RuntimeError('Packaged setup guide is incomplete')
+        window._guide.reject()
         window.close()
         return 0
+    window.start_first_run()
     return app.exec()
 
 

@@ -1,4 +1,20 @@
-# SolScribe 0.4.0 beta
+# SolScribe 0.4.1 beta
+
+- A four-step first-use guide sets appearance, audio source and live words, explains recording/review/notes, and offers optional sample practice. Skip it or reopen Guide from the footer or Settings.
+- Updates in the footer and Settings check the official GitHub releases. Startup checks are opt-in and throttled to once per day after a successful check. Recordings and notes are not part of the request.
+- Updates download in the background, verify the official asset checksum, and wait for your choice to install. Active recordings/tasks block installation; current edits and a database backup are saved before the installer opens. Cancellation and failed checks keep the existing app.
+- The footer now reads `zibah@2026`. Checkbox choices are clearly visible in both themes.
+- Release version metadata is checked across the app, installer and Windows file properties. Build steps derive their filenames from the version automatically.
+
+Users already on 0.4.0 must install 0.4.1 once to gain the update controls. Portable users can download the new portable folder or choose the normal installer; in-app Install uses the installer.
+
+This remains an unsigned beta. The normal Windows installer prompts still apply. Updates need an internet connection; basic local use and the guide do not. Installation is not silent. See `docs/UPDATES.md` for how to deliver later releases and `docs/041_REPORT.md` for executed verification. Existing hardware, 8 GB, writing-quality and accessibility acceptance limits remain.
+
+The Windows workflow checks source and packaged real HTTPS update downloads, source and packaged speech, both themes, scaling, legacy migration and two install/uninstall cycles. Each successful build includes the actual reports, checksums and source identity.
+
+---
+
+## Previous version: SolScribe 0.4.0 beta
 
 This version improves the existing private Windows meeting app while retaining the purple palette, light/dark themes, editable transcripts, four note types and all six export formats.
 
