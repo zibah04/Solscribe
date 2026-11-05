@@ -1,0 +1,21 @@
+# SolScribe 0.4.1 beta verification
+
+Implemented: safe user-controlled update checks/downloads/installer handoff, opt-in startup checks, a four-step interactive first-use guide with saved preferences and sample practice, replay controls, and the persistent `zibah@2026` footer. Application data schema and the existing recording/transcript/document workflow are retained.
+
+Linux: **159 passed**, 0 failed, 23.73 seconds. New coverage exercises semantic release order, no downgrades/drafts/unrequested previews, untrusted addresses, invalid digests/sizes, partial or changed downloads, cancellation, preserved cached files, backup-before-install handoff, failed backup preservation, active-recording guards, update consent, guide replay/practice and compact footers. Existing regressions remain. Undefined-name checks and release-version consistency checks passed.
+
+A real public HTTPS check selected the older published 0.4.0 beta, downloaded its 113,042,515-byte installer, and independently matched its recorded SHA256. It did not execute the downloaded installer. Metadata took 0.95 seconds; metadata plus verified download took 6.66 seconds on this cloud connection. This is not a client-network speed guarantee. Evidence: `docs/validation/041/update-source-linux.json`.
+
+The long Linux startup test was traced to resetting the existing QApplication's Fusion style over closed test windows. Reusing the active style and disposing closed test windows removed the redundant work; the final full run completed without the earlier stall. Production and test applications now use the same style.
+
+Windows: **159 passed**, 0 failed, 0 errors, 52.68 seconds on Python 3.11.9 x64. A further 75 scaling-case executions passed at 100/125/200%; the main suite ran at 150%. [Final Windows run](https://github.com/zibah04/Solscribe/actions/runs/42035906513) is successful on application source `4494747102eac8aee935f7e75191f5506b0394ce`.
+
+Source and packaged real speech recognition, both-theme startup, four guide pages, the creator footer, and two install/uninstall legacy-data preservation cycles all passed. Source and packaged real HTTPS update downloads independently verified the published 113 MB installer. Both Windows runs also checked that the internet-origin marker survived atomic download promotion. The normal Windows file-open handoff has a separate unit regression; no security prompts are bypassed or silently accepted.
+
+The Windows update check plus verified download took 2.19 seconds in source and 3.88 seconds in the packaged app on this runner. Windows build 26100, four logical CPUs and 16 GiB RAM measured 0.99 seconds for imports/first window, 87.8 MB idle RSS without a speech model, 0.33 seconds to load 10,000 transcript rows and 0.42 seconds for quick notes. These are synthetic/cloud measurements, not 8 GB laptop or physical audio certification. The exact JSON records and test XML are under `docs/validation/041`.
+
+[Download the tested Windows bundle](https://github.com/zibah04/Solscribe/actions/runs/42035906513/artifacts/13419235731) and [validation evidence](https://github.com/zibah04/Solscribe/actions/runs/42035906513/artifacts/13418926764). Actions downloads require GitHub sign-in and have 30-day retention. The final installer and portable ZIP are also being attached to a private beta draft, ready for separate public-release approval.
+
+Installer SHA256: `dee4251e56961892ba3cb97d66c48157e762c956a443571dcea7f1ce0103052d`. Portable ZIP SHA256: `44968b430fddba4ed3a588a67f70ff12d08a4daec3dbdcf342d7b29f9631d72a`. Build artifact digest: `sha256:2a50bed611948ff36bd6a8172d4e9d031b299d3a1f99942c6b103ca33558b129`. [Draft PR #2](https://github.com/zibah04/Solscribe/pull/2) targets main without merging it. No new public release has been published by this 0.4.1 work yet; 0.4.0 remains available. See `docs/UPDATES.md` for client and owner steps.
+
+Physical audio devices, 8 GB laptop performance, real Ollama writing quality, fresh consumer Windows, full screen-reader coverage and complex-script export remain acceptance limits from the 0.4 engineering report. This is still an unsigned beta; update hashes and HTTPS do not establish a verified publisher. Future code signing still needs legitimate credentials. Installation requires the user's explicit action.

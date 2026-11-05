@@ -1,0 +1,27 @@
+name: Stage private client download
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/solscribe-041-updates-guide]
+    paths:
+      - '.github/workflows/stage-client-download.yml'
+      - '.github/scripts/stage_client_download.py'
+
+jobs:
+  stage:
+    if: github.repository == 'zibah04/Solscribe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out release preparation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify tested artifacts and attach to private draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/stage_client_download.py

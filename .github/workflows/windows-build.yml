@@ -1,0 +1,207 @@
+name: Build SolScribe for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master, codex/windows-build-v0.2, codex/solscribe-040-remediation, codex/solscribe-041-updates-guide, codex/solscribe-050-lecture-mode]
+    paths:
+      - 'app.py'
+      - 'solscribe/**'
+      - 'requirements*.txt'
+      - 'assets/**'
+      - 'START_HERE.txt'
+      - 'RELEASE_NOTES.md'
+      - 'build_windows.bat'
+      - 'SolScribe.iss'
+      - 'tests/**'
+      - 'scripts/**'
+      - '.github/workflows/windows-build.yml'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python 3.11 x64
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+      - name: Validate release metadata
+        shell: pwsh
+        run: python scripts/release_version.py
+      - name: Install and validate dependencies, run regressions
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_SCALE_FACTOR: '1.5'
+        run: |
+          python -c "import struct; assert struct.calcsize('P') == 8"
+          python -m venv .venv
+          .venv/Scripts/python -m pip install -r requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .venv/Scripts/python -m pip check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .venv/Scripts/ruff check --select F821,F822,F823 solscribe scripts app.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .venv/Scripts/python scripts/run_tests.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$pwd/.venv/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Theme and compact layout checks at 100, 125 and 200 percent
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          foreach ($scale in @('1', '1.25', '2')) {
+            $env:QT_SCALE_FACTOR = $scale
+            python -m pytest -q tests/test_release.py tests/test_lecture.py::test_lecture_mode_at_laptop_sizes --junitxml="layout-$scale.xml"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Reproducible synthetic performance measurements
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python scripts/benchmark.py --output performance-windows.json
+      - name: Real speech recognition and cold-start timings
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Speech
+          $voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono)
+          $voice.SetOutputToWaveFile("$pwd/live-smoke.wav", $format)
+          $voice.Speak('Welcome to the meeting. We will prepare the report on Friday. This is a test of live speech captions. Please review the meeting report before sharing it.')
+          $voice.Dispose()
+          python scripts/smoke_live.py live-smoke.wav
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real public update check and verified download
+        shell: pwsh
+        run: python scripts/smoke_updates.py
+      - name: Build portable desktop executable
+        shell: cmd
+        run: build_windows.bat
+      - name: Packaged executable and real speech-engine smoke tests
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_SCALE_FACTOR: '1.5'
+        run: |
+          # Prevent source Python/venv directories from masking missing bundled DLLs.
+          $env:PATH = "$env:WINDIR\system32;$env:WINDIR"
+          Remove-Item Env:PYTHONHOME, Env:PYTHONPATH -ErrorAction SilentlyContinue
+          $app = Start-Process 'dist/SolScribe/SolScribe.exe' -ArgumentList '--smoke-test' -PassThru
+          if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Packaged application timed out' }
+          if ($app.ExitCode -ne 0) { throw "Packaged application failed: $($app.ExitCode)" }
+          $speech = Start-Process 'dist/SolScribe/SolScribe.exe' -ArgumentList @('--speech-smoke', 'live-smoke.wav') -PassThru
+          if (-not $speech.WaitForExit(240000)) { $speech.Kill(); throw 'Packaged recognizer timed out' }
+          if ($speech.ExitCode -ne 0) { throw "Packaged recognizer failed: $($speech.ExitCode)" }
+          Get-Content speech-packaged-metrics.json
+          $update = Start-Process 'dist/SolScribe/SolScribe.exe' -ArgumentList '--update-smoke' -PassThru
+          if (-not $update.WaitForExit(240000)) { $update.Kill(); throw 'Packaged updater timed out' }
+          if ($update.ExitCode -ne 0) { throw "Packaged updater failed: $($update.ExitCode)" }
+          Get-Content update-packaged-metrics.json
+      - name: Sign application when a legitimate certificate is provisioned
+        shell: pwsh
+        env:
+          SOLSCRIBE_SIGNING_THUMBPRINT: ${{ vars.WINDOWS_SIGNING_THUMBPRINT }}
+        run: ./scripts/sign_windows.ps1 -Path dist/SolScribe/SolScribe.exe
+      - name: Create portable ZIP
+        shell: pwsh
+        run: Compress-Archive -Path 'dist/SolScribe' -DestinationPath 'SolScribe-Portable-Windows.zip' -CompressionLevel Optimal
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows installer
+        shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "SolScribe.iss"'
+      - name: Sign installer when configured
+        shell: pwsh
+        env:
+          SOLSCRIBE_SIGNING_THUMBPRINT: ${{ vars.WINDOWS_SIGNING_THUMBPRINT }}
+        run: ./scripts/sign_windows.ps1 -Path "Output/SolScribe-Setup-${env:SOLSCRIBE_VERSION}.exe"
+      - name: Install, migrate, uninstall and reinstall with existing user data
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_SCALE_FACTOR: '1.5'
+        run: |
+          trap { Write-Output ("::error title=Installer validation::" + ($_.Exception.Message -replace '[\r\n]', ' ')); exit 1 }
+          $env:LOCALAPPDATA = "$env:RUNNER_TEMP/SolScribe-test-profile"
+          python scripts/check_install.py seed
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installDir = "$env:RUNNER_TEMP/SolScribe-installed"
+          foreach ($attempt in @(1, 2)) {
+            $setup = Start-Process "Output/SolScribe-Setup-${env:SOLSCRIBE_VERSION}.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$installDir", "/LOG=$pwd/install-$attempt.log") -PassThru
+            if (-not $setup.WaitForExit(120000)) { $setup.Kill(); throw 'Installer timed out' }
+            if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
+            Write-Output "::notice title=Installer validation::Install attempt $attempt completed"
+            $app = Start-Process "$installDir/SolScribe.exe" -ArgumentList '--smoke-test' -PassThru
+            if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Installed app timed out' }
+            if ($app.ExitCode -ne 0) { throw "Installed app failed: $($app.ExitCode)" }
+            python scripts/check_install.py verify
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Output "::notice title=Installer validation::Installed app and existing data verified, attempt $attempt"
+            $uninstaller = Get-ChildItem -LiteralPath $installDir -Filter 'unins*.exe' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+            if (-not $uninstaller) { throw 'Installed uninstaller was not found' }
+            $remove = Start-Process $uninstaller.FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$pwd/uninstall-$attempt.log") -PassThru
+            if (-not $remove.WaitForExit(60000)) { $remove.Kill(); throw 'Uninstaller timed out' }
+            if ($remove.ExitCode -ne 0) { throw "Uninstaller failed: $($remove.ExitCode)" }
+            # Inno may finish in a temporary child process; wait for its files to
+            # be removed before immediately testing reinstallation.
+            $deadline = (Get-Date).AddSeconds(30)
+            while (((Test-Path "$installDir/SolScribe.exe") -or (Test-Path $uninstaller.FullName)) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
+            if ((Test-Path "$installDir/SolScribe.exe") -or (Test-Path $uninstaller.FullName)) { throw 'Uninstaller did not finish removing the application' }
+            Write-Output "::notice title=Installer validation::Application removed, attempt $attempt"
+            python scripts/check_install.py verify
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Record tested dependencies, signing status and checksums
+        shell: pwsh
+        run: |
+          python -m pip freeze | Out-File -Encoding utf8 requirements-tested-windows.txt
+          @("SolScribe ${env:SOLSCRIBE_RELEASE_TAG}", "Source: $env:GITHUB_SHA", "Build: $env:GITHUB_RUN_ID", (python --version)) | Out-File -Encoding utf8 BUILD_INFO.txt
+          Get-AuthenticodeSignature dist/SolScribe/SolScribe.exe, "Output/SolScribe-Setup-${env:SOLSCRIBE_VERSION}.exe" | Select-Object Path, Status, StatusMessage | Format-List | Out-File -Encoding utf8 SIGNING_STATUS.txt
+          Get-ChildItem 'Output/SolScribe-Setup-*.exe', 'SolScribe-Portable-Windows.zip' | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } | Out-File -Encoding utf8 SHA256SUMS.txt
+      - name: Summarize measurements for review
+        if: always()
+        shell: pwsh
+        run: python scripts/summarize_validation.py
+      - name: Upload test and measurement evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SolScribe-Validation
+          path: |
+            windows-tests.xml
+            pytest-console.log
+            install-*.log
+            uninstall-*.log
+            layout-*.xml
+            performance-windows.json
+            speech-*-metrics.json
+            update-*-metrics.json
+            build/SolScribe/warn-SolScribe.txt
+          retention-days: 30
+      - name: Upload Windows installer and portable build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SolScribe-Windows
+          path: |
+            Output/SolScribe-Setup-*.exe
+            SolScribe-Portable-Windows.zip
+            START_HERE.txt
+            RELEASE_NOTES.md
+            LICENSE
+            BUILD_INFO.txt
+            SIGNING_STATUS.txt
+            SHA256SUMS.txt
+            requirements-tested-windows.txt
+            windows-tests.xml
+            performance-windows.json
+            speech-*-metrics.json
+            update-*-metrics.json
+          if-no-files-found: error
+          retention-days: 30

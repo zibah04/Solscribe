@@ -1,0 +1,26 @@
+{
+  "version": "0.5.0",
+  "os": "Windows-10-10.0.26100-SP0",
+  "python": "3.11.9",
+  "architecture": "AMD64",
+  "cpu": "AMD64 Family 25 Model 17 Stepping 1, AuthenticAMD",
+  "logical_cpus": 4,
+  "physical_ram_bytes": 17174360064,
+  "scope": "Synthetic local data, offscreen UI; no speech model, disk microphone, or physical-device latency.",
+  "startup_imports_and_first_window_s": 0.4544,
+  "idle_rss_bytes": 88989696,
+  "transcript_rows": 10000,
+  "load_and_render_s": 0.2176,
+  "loaded_rss_bytes": 120631296,
+  "quick_notes_s": 0.2883,
+  "persist_all_rows_s": 0.2425,
+  "synthetic_90min_stream": {
+    "source_seconds": 5400.0,
+    "wall_s": 0.7842,
+    "traced_current_bytes": 76072,
+    "traced_peak_bytes": 461694,
+    "retained_context_frames": 16000,
+    "sampled_processing_windows": 256,
+    "recognizer": "FakeRecognizer; buffer retention only"
+  }
+}
