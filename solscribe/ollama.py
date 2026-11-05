@@ -1,9 +1,10 @@
 """Cancellable, bounded local-only Ollama client. No cloud or proxy requests."""
 from __future__ import annotations
 import http.client
+import io
 import json
 import re
-import socket
+import select
 import threading
 import time
 
@@ -12,39 +13,69 @@ class Cancelled(Exception):
     pass
 
 
+class _ResponseReader(io.RawIOBase):
+    """Poll cancellation on reads instead of relying on cross-thread shutdown.
+
+    Own a duplicate socket: HTTP/1.0 may detach/close HTTPConnection's handle
+    while HTTPResponse still reads its body. No polling timeout poisons a
+    buffered socket.makefile reader, and no extra request thread is retained.
+    """
+    def __init__(self, transport, cancelled, deadline):
+        super().__init__()
+        self.transport = transport.dup()
+        self.transport.setblocking(False)
+        self.cancelled, self.deadline = cancelled, deadline
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        if not len(buffer):
+            return 0
+        while True:
+            if self.cancelled.is_set():
+                raise Cancelled('Writing cancelled')
+            remaining = self.deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError('Writing helper exceeded the time limit')
+            ready, _, _ = select.select([self.transport], [], [], min(.1, remaining))
+            if ready:
+                try:
+                    return self.transport.recv_into(buffer)
+                except BlockingIOError:
+                    continue
+
+    def close(self):
+        self.transport.close()
+        super().close()
+
+
 class OllamaClient:
     def __init__(self, *, port=11434, timeout=180, context=4096):
         self.port, self.timeout, self.context = port, timeout, context
         self.cancelled = threading.Event()
-        self._lock = threading.Lock()
-        self._connection = None
-        self._socket = None
         self._available = set()
         self._loaded = None
 
     def cancel(self):
         self.cancelled.set()
-        with self._lock:
-            active_socket = self._socket
-            if active_socket is not None:
-                try:
-                    active_socket.shutdown(socket.SHUT_RDWR)
-                except OSError:
-                    pass
 
     def _request(self, method, path, payload=None, *, streaming=False):
         if self.cancelled.is_set():
             raise Cancelled('Writing cancelled')
         connection = http.client.HTTPConnection('127.0.0.1', self.port, timeout=3)
-        with self._lock:
-            self._connection = connection
         began = time.monotonic()
+        response = None
+        cancelled = self.cancelled
+        deadline = began + (self.timeout if streaming else min(3, self.timeout))
+        class ResponseSocket:
+            def __init__(self, transport):
+                self.transport = transport
+            def makefile(self, mode):
+                return io.BufferedReader(_ResponseReader(self.transport, cancelled, deadline))
+        connection.response_class = lambda transport, *args, **kwargs: http.client.HTTPResponse(ResponseSocket(transport), *args, **kwargs)
         try:
             connection.connect()
-            with self._lock:
-                # HTTP/1.0 can detach the connection socket once headers arrive;
-                # retain it so cancellation still interrupts a response-body read.
-                self._socket = connection.sock
             if self.cancelled.is_set():
                 raise Cancelled('Writing cancelled')
             connection.sock.settimeout(min(30 if streaming else 3, self.timeout))
@@ -94,11 +125,9 @@ class OllamaClient:
                 raise ValueError('Writing helper returned an invalid HTTP response') from exc
             raise
         finally:
+            if response is not None:
+                response.close()
             connection.close()
-            with self._lock:
-                if self._connection is connection:
-                    self._connection = None
-                    self._socket = None
 
     def ensure_available(self, model: str):
         if not re.fullmatch(r'[\w./:-]{1,150}', model):

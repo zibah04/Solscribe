@@ -121,7 +121,11 @@ def test_missing_local_model_does_not_trigger_a_download(server):
     assert not state['calls']
 
 
-def test_cancel_interrupts_a_waiting_local_writing_request(server):
+@pytest.mark.parametrize('shutdown_available', [True, False])
+def test_cancel_interrupts_a_waiting_local_writing_request(server, monkeypatch, shutdown_available):
+    if not shutdown_available:
+        import socket
+        monkeypatch.setattr(socket.socket, 'shutdown', lambda *args: None)
     state, port = server
     state['delay'] = True
     client, errors = OllamaClient(port=port), []
