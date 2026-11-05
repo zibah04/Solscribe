@@ -1,6 +1,6 @@
 # Sending SolScribe updates to remote users
 
-Clients need to install 0.4.1 once. Earlier 0.4.0 builds cannot acquire update controls remotely. After that, they can use **Updates** in the footer or **Settings → Check for updates**. Optional startup checks can be enabled in the guide or Settings. An available version appears in the footer; nothing installs automatically.
+Clients on 0.4.0 need to install 0.5.0 (or a later release) once. Earlier 0.4.0 builds cannot acquire update controls remotely. After that, they can use **Updates** in the footer or **Settings → Check for updates**. Optional startup checks can be enabled in the guide or Settings. An available version appears in the footer; nothing installs automatically.
 
 The client checks the official public GitHub releases for this repository. It ignores drafts, older versions and malformed release files. Beta clients can receive newer beta or stable versions; stable builds skip preview versions. It requires the expected versioned Windows installer and its SHA256 digest from GitHub. It follows only HTTPS addresses on the official repository and GitHub asset hosts. No transcript, meeting title, recording or account token is sent.
 
@@ -17,8 +17,8 @@ Portable users can use the same check/download flow, but Install opens the norma
 5. Review the draft and obtain publication approval. Publish only when the complete installer asset and notes are ready. The app never offers draft releases. A release missing its expected installer or digest is not installed.
 6. Remote users receive the available-version notice on their next enabled startup check, or can click Updates immediately. They decide when to download and install. Users who keep the app open can check manually without restarting.
 
-No new cloud backend, customer account or client API key is needed. Main-branch merging and public release publication remain separate review decisions. The original private-draft staging workflow intentionally refuses to modify the already published 0.4.0 release; a new version needs a new draft and verified build.
+No new cloud backend, customer account or client API key is needed. Main-branch merging and public release publication remain separate review decisions. Private-draft staging workflows refuse to modify a published release. Each new version needs its own draft and verified build. The 0.5.0 lecture build includes the guide and updater previously validated in the private 0.4.1 draft.
 
 ## First-use guide
 
-The optional four-step guide appears on first normal launch, including an upgrade from 0.4.0 where the guide has not been seen. It explains privacy/appearance, microphone and computer sound, recording/review, then notes/saving/updates. The user can choose actual preferences, practise with a sample, or skip. The sample is saved text, not a microphone mode. The footer and Settings reopen the guide at any time while idle. Credit remains visible as `zibah@2026` in either theme and compact layouts.
+The optional four-step guide appears on first normal launch, including an upgrade from 0.4.0 where the guide has not been seen. It explains privacy/appearance, Meeting or Lecture purpose, microphone and computer sound, recording/review, then notes/revision/saving/updates. The user can choose actual preferences, practise with a sample, or skip. The sample is saved text, not a microphone mode. The footer and Settings reopen the guide at any time while idle. Credit remains visible as `zibah@2026` in either theme and compact layouts.
