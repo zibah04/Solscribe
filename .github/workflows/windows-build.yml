@@ -134,14 +134,16 @@ jobs:
             python scripts/check_install.py verify
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             Write-Output "::notice title=Installer validation::Installed app and existing data verified, attempt $attempt"
-            $remove = Start-Process "$installDir/unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$pwd/uninstall-$attempt.log") -PassThru
+            $uninstaller = Get-ChildItem -LiteralPath $installDir -Filter 'unins*.exe' | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+            if (-not $uninstaller) { throw 'Installed uninstaller was not found' }
+            $remove = Start-Process $uninstaller.FullName -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$pwd/uninstall-$attempt.log") -PassThru
             if (-not $remove.WaitForExit(60000)) { $remove.Kill(); throw 'Uninstaller timed out' }
             if ($remove.ExitCode -ne 0) { throw "Uninstaller failed: $($remove.ExitCode)" }
             # Inno may finish in a temporary child process; wait for its files to
             # be removed before immediately testing reinstallation.
             $deadline = (Get-Date).AddSeconds(30)
-            while ((Test-Path "$installDir/SolScribe.exe") -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
-            if (Test-Path "$installDir/SolScribe.exe") { throw 'Uninstaller did not finish removing the application' }
+            while (((Test-Path "$installDir/SolScribe.exe") -or (Test-Path $uninstaller.FullName)) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
+            if ((Test-Path "$installDir/SolScribe.exe") -or (Test-Path $uninstaller.FullName)) { throw 'Uninstaller did not finish removing the application' }
             Write-Output "::notice title=Installer validation::Application removed, attempt $attempt"
             python scripts/check_install.py verify
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
