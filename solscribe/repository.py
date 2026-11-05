@@ -1,6 +1,6 @@
 """Transactional meeting repository, explicit audio ownership and recoverable deletion."""
 from __future__ import annotations
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime
 import json
 import logging
@@ -45,7 +45,7 @@ class Store:
         self.recovery_notices: list[str] = []
         existing = self.database.is_file() and self.database.stat().st_size > 0
         if existing:
-            with sqlite3.connect(self.database, timeout=3) as connection:
+            with closing(sqlite3.connect(self.database, timeout=3)) as connection:
                 if connection.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
                     raise sqlite3.DatabaseError('Meeting database needs recovery from a backup')
                 version = connection.execute('PRAGMA user_version').fetchone()[0]

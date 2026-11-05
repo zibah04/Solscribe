@@ -22,6 +22,7 @@ The existing purple light/dark appearance remains, with compact navigation and s
 | Qt completion signals could arrive after a worker was already no longer running | Busy flags held through UI finished handling; protected navigation and shutdown |
 | Large transcript loading resized every row; small windows hid useful workspace | Preallocated rows, visible-row sizing, compact controls and scrollable content |
 | Rich-export conversion removed meaningful punctuation/markup content | Shared Markdown AST, literal/code/link/table handling and paginated document renderers |
+| SQLite transaction contexts left backup handles open on Windows | Explicit connection closing before atomic replacement, with a regression enforcing the file-handle contract |
 | Saved malformed JSON was interpreted as empty content | Reject damaged content without overwriting original DB; recovery route preserves it |
 
 ## C. Architecture
@@ -34,7 +35,7 @@ Persistence, filesystem/recovery, audio packets/resampling/mixing, caption engin
 - Expanded suite before the final worker checks: **120 passed**, 0 failed, 32.10 seconds.
 - Static undefined-name checks: passed (`ruff F821,F822,F823`).
 - Deterministic coverage includes shared/legacy media, trash, restore hashes/traversal, drafts, live-PID protection, corrupt-DB quarantine, time gaps/overlap, resampling, two-source mixing/drift/failure, transcript corrections, local HTTP cancellation, action evidence, review state, compact layout and Unicode/long-table export.
-- Final Linux suite: **122 passed**, 0 failed, 34.32 seconds (`final-linux.xml`), including slow-stop UI responsiveness and final-decoder cancellation cleanup. New Windows build results will be recorded after execution; a configured workflow is not itself evidence of a successful build.
+- Final Linux suite: **123 passed**, 0 failed, 32.32 seconds (`final-linux.xml`), including slow-stop UI responsiveness and final-decoder cancellation cleanup. New Windows build results will be recorded after execution; a configured workflow is not itself evidence of a successful build.
 
 The Windows workflow checks x64 architecture, dependencies, Qt scaling, source and packaged real recognition from synthetic spoken audio, packaged theme startup, a pre-0.4 schema migration, install/remove/reinstall and existing-data preservation. It saves JUnit XML, measurements, exact dependency versions, source SHA, checksums and signing status. These tests do not establish physical device reliability.
 

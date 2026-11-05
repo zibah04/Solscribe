@@ -1,5 +1,6 @@
 """Validated local backups. Restores stage and verify all data before replacement."""
 from __future__ import annotations
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -23,7 +24,7 @@ def digest(path: Path) -> str:
 
 
 def validate_database(path: Path) -> None:
-    with sqlite3.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True) as connection:
+    with closing(sqlite3.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True)) as connection:
         if connection.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
             raise ValueError('Backup database failed its integrity check')
         columns = {row[1] for row in connection.execute('PRAGMA table_info(sessions)')}
@@ -40,8 +41,8 @@ def snapshot_database(source: Path, destination: Path) -> Path:
     if source.resolve() == destination.resolve():
         raise ValueError('A backup cannot overwrite the live database')
     with atomic_destination(destination) as temporary:
-        with sqlite3.connect(source.resolve().as_uri() + '?mode=ro', uri=True, timeout=3) as original:
-            with sqlite3.connect(temporary) as backup:
+        with closing(sqlite3.connect(source.resolve().as_uri() + '?mode=ro', uri=True, timeout=3)) as original:
+            with closing(sqlite3.connect(temporary)) as backup:
                 original.backup(backup, pages=128, sleep=.02)
         validate_database(temporary)
     return destination
@@ -74,7 +75,7 @@ def create_archive(store, destination: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix='.backup-', dir=store.root) as directory:
         snapshot = snapshot_database(store.database, Path(directory) / 'solscribe.db')
         # Read asset metadata from the same snapshot as the archived sessions.
-        with sqlite3.connect(snapshot) as connection:
+        with closing(sqlite3.connect(snapshot)) as connection:
             assets = connection.execute("SELECT id,path FROM recordings WHERE owned=1 AND state NOT IN ('purging','purged')").fetchall()
         manifest = {'version': 1, 'database_sha256': digest(snapshot), 'assets': []}
         with atomic_destination(destination) as temporary:
@@ -159,7 +160,7 @@ def restore_archive(root: Path, source: Path) -> None:
                 except sqlite3.DatabaseError:
                     with atomic_destination(prior) as temporary:
                         shutil.copyfile(current, temporary)
-            with sqlite3.connect(database) as connection:
+            with closing(sqlite3.connect(database)) as connection, connection:
                 for asset in manifest['assets']:
                     name = f'{asset["id"]}-{uuid.uuid4().hex[:8]}{Path(asset["name"]).suffix}'
                     destination = recordings / name

@@ -41,6 +41,8 @@ def window(app, tmp_path, monkeypatch):
     monkeypatch.setattr(ui.SystemLoopbackRecorder, 'devices', staticmethod(lambda: []))
     monkeypatch.setattr(ui.QMessageBox, 'warning', lambda *args: None)
     w = ui.MainWindow()
+    unexpected_errors = []
+    monkeypatch.setattr(w, '_show_error', lambda *args: unexpected_errors.append(args))
     w.show()
     app.processEvents()
     yield w
@@ -54,6 +56,7 @@ def window(app, tmp_path, monkeypatch):
         w._live_worker.wait(5000)
     app.processEvents()
     w.close()
+    assert not unexpected_errors, unexpected_errors
 
 
 @pytest.mark.parametrize('size', [(1000, 640), (1280, 680)])

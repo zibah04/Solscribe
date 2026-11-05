@@ -198,6 +198,29 @@ def test_raw_database_restore_quarantines_corrupt_current_database(tmp_path):
     assert any(path.read_bytes() == corrupt for path in store.backups.glob('before-restore-*.db'))
 
 
+def test_snapshot_closes_sqlite_handles_before_atomic_replacement(tmp_path, monkeypatch):
+    from solscribe import backups, filesystem
+    store = Store(tmp_path)
+    store.create('Portable backup')
+    handles = []
+    connect, replace = sqlite3.connect, filesystem.os.replace
+    class TrackedConnection(sqlite3.Connection):
+        closed = False
+        def close(self):
+            self.closed = True
+            return super().close()
+    def tracked(*args, **kwargs):
+        connection = connect(*args, factory=TrackedConnection, **kwargs)
+        handles.append(connection)
+        return connection
+    def checked_replace(source, destination):
+        assert handles and all(item.closed for item in handles), 'SQLite handles would prevent replacement on Windows'
+        return replace(source, destination)
+    monkeypatch.setattr(backups.sqlite3, 'connect', tracked)
+    monkeypatch.setattr(filesystem.os, 'replace', checked_replace)
+    store.backup_database(tmp_path / 'checked.db')
+
+
 @pytest.mark.parametrize('content', ['{broken', '[42]', '{"unexpected": "object"}'])
 def test_damaged_saved_transcript_is_not_silently_replaced(tmp_path, content):
     store = Store(tmp_path)
