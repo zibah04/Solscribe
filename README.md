@@ -60,7 +60,7 @@ Audio and transcript processing is local by default. Speech models require a fir
 
 The database, WAVs, backups and drafts are **not encrypted by SolScribe**. Anyone with access to the Windows profile can read them. Use Windows account protection and BitLocker/device encryption where available; secure exported copies too. An in-app encrypted vault is deferred until key recovery and migration can be designed without locking people out of existing files.
 
-The build is unsigned unless `SIGNING_STATUS.txt` verifies otherwise. No signing certificate is supplied. Keep Windows security protections enabled. Physical audio reliability, mixed-source drift, multilingual accuracy, screen-reader behavior and 8 GB laptop performance need the checks in [Windows acceptance](docs/WINDOWS_ACCEPTANCE.md) before a wider release. Live captions are provisional; driver/device failures can cause missing audio, with warnings where detected. No automatic updates, syncing, translation or diarization are included.
+The build is unsigned unless `SIGNING_STATUS.txt` verifies otherwise. No signing certificate is supplied. Keep Windows security protections enabled. Combined capture has no acoustic echo cancellation; headphones help avoid duplicate playback through the microphone. Physical audio reliability, mixed-source drift, multilingual accuracy, screen-reader behavior and 8 GB laptop performance need the checks in [Windows acceptance](docs/WINDOWS_ACCEPTANCE.md) before a wider release. Live captions are provisional; driver/device failures can cause missing audio, with warnings where detected. No automatic updates, syncing, translation or diarization are included.
 
 ## Keyboard access
 
