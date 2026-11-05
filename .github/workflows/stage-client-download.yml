@@ -3,7 +3,7 @@ name: Stage private client download
 on:
   workflow_dispatch:
   push:
-    branches: [codex/solscribe-040-remediation]
+    branches: [codex/solscribe-041-updates-guide]
     paths:
       - '.github/workflows/stage-client-download.yml'
       - '.github/scripts/stage_client_download.py'

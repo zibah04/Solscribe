@@ -6,13 +6,13 @@ import tempfile
 from pathlib import Path
 
 REPOSITORY = 'zibah04/Solscribe'
-RUN_ID = '42001168415'
-SOURCE = 'b551cf5da1e8bc0d75065c98f1a3b1406dd5ea85'
-RELEASE_ID = 435156635
-TAG = 'v0.4.0-beta.1'
+RUN_ID = '42032772170'
+SOURCE = 'f1290dffb5aeffd204609d37959d862fbaebc802'
+RELEASE_ID = 435226602
+TAG = 'v0.4.1-beta.1'
 EXPECTED = {
-    'SolScribe-Setup-0.4.0.exe': '56804ea0291ca01f6824247a398aea0b6cdcc99b781282e27fbb348721e50efa',
-    'SolScribe-Portable-Windows.zip': '8062926cedcd1da9894cc1ef87788f20cf899586d173a4fdbc3d5d39610d5d11',
+    'SolScribe-Setup-0.4.1.exe': '325eee3777266caf392e57158de24eabc2ac4f741c259405ba18a3ee13957ed8',
+    'SolScribe-Portable-Windows.zip': '614748cde0b2982994b731861d339b5689f4a71e24f36666eacb7df03c486bb6',
 }
 
 
@@ -55,8 +55,9 @@ def main():
         for path in files:
             if digest(path) != EXPECTED[path.name]:
                 raise RuntimeError(f'Tested build checksum mismatch: {path.name}')
-        if SOURCE not in locate(root, 'BUILD_INFO.txt').read_text(encoding='utf-8-sig'):
-            raise RuntimeError('Downloaded build identity does not match the tested source')
+        identity = locate(root, 'BUILD_INFO.txt').read_text(encoding='utf-8-sig')
+        if SOURCE not in identity or TAG not in identity:
+            raise RuntimeError('Downloaded build identity does not match the tested source and release tag')
         files += [locate(root, name) for name in ('SHA256SUMS.txt', 'START_HERE.txt',
                   'RELEASE_NOTES.md', 'BUILD_INFO.txt', 'SIGNING_STATUS.txt', 'LICENSE',
                   'requirements-tested-windows.txt')]
