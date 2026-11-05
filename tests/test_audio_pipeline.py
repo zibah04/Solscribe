@@ -127,3 +127,25 @@ def test_out_of_order_packets_are_rejected():
     engine.accept(AudioPacket(pcm(), 16000, 32000))
     with pytest.raises(ValueError, match='out of order'):
         engine.accept(AudioPacket(pcm(), 16000, 0))
+
+
+def test_final_transcription_cancel_during_decode_releases_model_and_keeps_result_unpublished(tmp_path, monkeypatch):
+    import sys
+    import types
+    from solscribe.transcriber import TranscriptionWorker
+    source = tmp_path / 'existing.wav'
+    source.write_bytes(b'existing audio')
+    released, results = [], []
+    worker = TranscriptionWorker(source, 'tiny', 'en', tmp_path)
+    class Model:
+        def __init__(self, *args, **kwargs):
+            self.model = types.SimpleNamespace(unload_model=lambda: released.append(True))
+        def transcribe(self, *args, **kwargs):
+            def segments():
+                worker.cancel()
+                yield types.SimpleNamespace(start=0, end=1, text='Do not publish partial words')
+            return segments(), types.SimpleNamespace(duration=1, language='en')
+    monkeypatch.setitem(sys.modules, 'faster_whisper', types.SimpleNamespace(WhisperModel=Model))
+    worker.result.connect(results.append)
+    worker.run()
+    assert released == [True] and not results

@@ -24,6 +24,7 @@ class RecordingActions:
             self.record_timer.stop()
             self.record_btn.setText('Finishing…')
             self.status_label.setText('Saving recording and finishing the last words…')
+            self._stopping_active = True
             self._stop_worker = OperationWorker(self.recorder.stop, self)
             self._stop_worker.done.connect(self._recording_stopped)
             self._stop_worker.failed.connect(self._recording_stop_failed)
@@ -79,6 +80,7 @@ class RecordingActions:
                 self._live_failed_message = None
                 self.caption_status.setText('Getting ready to listen · first use needs a download. Your recording is safe.')
                 self.search_transcript.clear()
+                self._live_active = True
                 self._live_worker = LiveTranscriptionWorker(
                     live_queue, model, self.language_combo.currentData(), self.store.models, self)
                 self._live_worker.status.connect(self._live_status)
@@ -86,7 +88,7 @@ class RecordingActions:
                 self._live_worker.failed.connect(self._live_failed)
                 self._live_worker.finished.connect(self._live_finished)
                 self._live_worker.start()
-                self.tabs.setCurrentIndex(0)
+                self.focus_tab(0)
             else:
                 self.caption_status.setText('Recording only · enable live transcription before your next recording for captions')
             self.record_btn.setText('Stop recording')
@@ -98,6 +100,8 @@ class RecordingActions:
             self.record_timer.start()
             self.update_actions()
         except Exception as exc:
+            if not self._live_worker or not self._live_worker.isRunning():
+                self._live_active = False
             if self.recorder.active:
                 self.recorder.stop()
             self._show_error('Microphone unavailable',
@@ -131,6 +135,7 @@ class RecordingActions:
         if self._live_session_id != self.session_id or not new_segments:
             return
         # No reload while recording, so the user's current focus and edits survive.
+        manual_pending = self.save_timer.isActive() or bool(self._save_error)
         self.table.blockSignals(True)
         for part in new_segments:
             row = self.table.rowCount()
@@ -147,7 +152,19 @@ class RecordingActions:
         for row in range(self.table.rowCount() - len(new_segments), self.table.rowCount()):
             self.table.setRowHidden(row, False)
         self.table.scrollToBottom()
-        self.persist()
+        self.resize_visible_rows()
+        if manual_pending:
+            self.persist()
+        else:
+            # Avoid scanning thousands of Qt cells for every live batch. The
+            # cached transcript is authoritative when no manual edit is pending.
+            updated = self.current_session.get('segments', []) + new_segments
+            try:
+                self.store.update(self.session_id, segments=updated)
+            except Exception as exc:
+                self._save_error = str(exc)
+            self.current_session['segments'] = updated
+            self.update_actions()
 
     def _live_failed(self, message):
         self._live_failed_message = message
@@ -155,6 +172,7 @@ class RecordingActions:
         self.status_label.setText('Recording continues · words are temporarily unavailable')
 
     def _live_finished(self):
+        self._live_active = False
         if not self.record_timer.isActive():
             self.persist()
             count = self.table.rowCount()
@@ -191,6 +209,7 @@ class RecordingActions:
             self._live_worker.stop()
 
     def _recording_stop_finished(self):
+        self._stopping_active = False
         if self.recorder.active:
             self.record_timer.start()
             self.record_btn.setText('Stop recording')

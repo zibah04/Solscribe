@@ -8,9 +8,35 @@ from ..storage import Store
 
 
 class StorageActions:
+    def show_meetings(self):
+        if self._is_busy() or self.record_timer.isActive() or not self.persist():
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Your meetings')
+        dialog.resize(520, 360)
+        layout = QVBoxLayout(dialog)
+        items = QListWidget()
+        for meeting in self.store.list():
+            item = QListWidgetItem(meeting['title'])
+            item.setData(Qt.UserRole, meeting['id'])
+            items.addItem(item)
+        layout.addWidget(items)
+        def choose(item):
+            if item:
+                self.load_session(item.data(Qt.UserRole))
+                self.reload_library(select_id=self.session_id)
+                self.focus_tab(0)
+                dialog.accept()
+        items.itemDoubleClicked.connect(choose)
+        button = QPushButton('Open meeting')
+        button.clicked.connect(lambda: choose(items.currentItem()))
+        layout.addWidget(button)
+        dialog.exec()
+
     def _storage_operation(self, operation, message, *, restoring=False):
         if self._is_busy() or self.record_timer.isActive() or not self.persist():
             return
+        self._storage_active = True
         self._storage_restoring = restoring
         self._storage_succeeded = False
         self._storage_worker = OperationWorker(operation, self)
@@ -35,6 +61,7 @@ class StorageActions:
             self.status_label.setText(f'Backup saved: {result}')
 
     def _storage_finished(self):
+        self._storage_active = False
         self.progress.hide()
         if self._storage_restoring and self._storage_succeeded and not self.session_id:
             self.new_session()
@@ -51,7 +78,7 @@ class StorageActions:
     def restore_meetings(self):
         if self._is_busy() or self.record_timer.isActive():
             return
-        path, _ = QFileDialog.getOpenFileName(self, 'Restore a backup', str(Path.home()), 'SolScribe backup (*.zip)')
+        path, _ = QFileDialog.getOpenFileName(self, 'Restore a backup', str(self.store.backups), 'SolScribe backup (*.zip *.db)')
         if not path:
             return
         if QMessageBox.question(self, 'Restore this backup?',
@@ -60,7 +87,8 @@ class StorageActions:
             return
         self.player.stop()
         store = self.store
-        self._storage_operation(lambda: store.restore_archive(Path(path), confirm=True), 'Checking and restoring backup…', restoring=True)
+        restore = store.restore_database if Path(path).suffix.lower() == '.db' else store.restore_archive
+        self._storage_operation(lambda: restore(Path(path), confirm=True), 'Checking and restoring backup…', restoring=True)
 
     def delete_session(self):
         if self._is_busy() or self.record_timer.isActive() or not self.session_id or not self.persist():

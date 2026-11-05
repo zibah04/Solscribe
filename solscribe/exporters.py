@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .reports import transcript_text
+from .document_markup import blocks, inline_runs, plain_text
 
 
 def safe_filename(name):
@@ -41,35 +42,22 @@ def srt_text(segments):
 
 
 def section_content(session, section):
+    if section == 'Action register':
+        from .intelligence import render_actions
+        from .reports import stamp
+        return render_actions(session.get('action_items', []), session.get('title') or 'Meeting', stamp)
     if section == 'Transcript':
         title = session.get('title') or 'Meeting'
         text = transcript_text(session.get('segments') or [])
         return f'# Transcript · {title}\n\n{text or "(No transcript yet.)"}'
     mapping = {'Summary': 'summary', 'Minutes': 'minutes', 'Memo': 'memo', 'Action items': 'actions'}
     content = (session.get(mapping.get(section, ''), '') or '').strip()
-    return content or f'# {section}\n\nNo content yet. Generate or write this document first.'
-
-
-def _content_lines(markdown):
-    """Parse common document syntax without treating arbitrary meeting text as HTML."""
-    for line in markdown.splitlines():
-        value = line.rstrip()
-        if not value:
-            yield 'blank', ''
-        elif value.startswith('# '):
-            yield 'title', value[2:].strip()
-        elif value.startswith('## '):
-            yield 'section', value[3:].strip()
-        elif value.startswith('### '):
-            yield 'subsection', value[4:].strip()
-        elif value.startswith('- '):
-            yield 'bullet', value[2:].strip()
-        else:
-            yield 'body', value.replace('  ', ' ').strip()
+    result = content or f'# {section}\n\nNo content yet. Generate or write this document first.'
+    return result if session.get('reviewed_at') else '*Draft · review names, decisions and dates before sharing.*\n\n' + result
 
 
 def _strip_md(text):
-    return re.sub(r'\*\*(.*?)\*\*', r'\1', text).replace('*', '')
+    return plain_text(text)
 
 
 def write_docx(path, content):
@@ -88,29 +76,41 @@ def write_docx(path, content):
     for style in ('Title', 'Heading 1', 'Heading 2'):
         document.styles[style].font.name = 'Aptos Display'
         document.styles[style].font.color.rgb = RGBColor(42, 48, 91)
-    for kind, value in _content_lines(content):
-        if kind == 'blank':
-            continue
-        if kind == 'title':
-            document.add_heading(_strip_md(value), 0)
-        elif kind == 'section':
-            document.add_heading(_strip_md(value), 1)
-        elif kind == 'subsection':
-            document.add_heading(_strip_md(value), 2)
-        elif kind == 'bullet':
-            document.add_paragraph(_strip_md(value), style='List Bullet')
+    def runs(paragraph, children):
+        for text, bold, italic, code in inline_runs(children):
+            run = paragraph.add_run(text)
+            run.bold, run.italic = bold, italic
+            if code:
+                run.font.name = 'Consolas'
+    for block in blocks(content):
+        kind = block['kind']
+        if kind == 'table':
+            rows = block['rows']
+            table = document.add_table(rows=0, cols=max(len(row) for row in rows))
+            table.style = 'Light Shading Accent 1'
+            for row in rows:
+                cells = table.add_row().cells
+                for index, children in enumerate(row):
+                    runs(cells[index].paragraphs[0], children)
+        elif kind == 'code':
+            document.add_paragraph(block['text']).style = 'No Spacing'
         else:
-            # Metadata lines use bold label if provided in Markdown.
-            p = document.add_paragraph()
-            parts = re.split(r'(\*\*[^*]+\*\*)', value)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    p.add_run(part[2:-2]).bold = True
-                elif part:
-                    p.add_run(part)
+            if kind == 'heading':
+                paragraph = document.add_heading(level=min(3, block['level'] - 1))
+            else:
+                paragraph = document.add_paragraph(style='List Bullet' if block['prefix'] == '- ' else 'Quote' if kind == 'quote' else None)
+            if block['prefix'] and block['prefix'] != '- ':
+                paragraph.add_run(block['prefix'])
+            runs(paragraph, block['children'])
     footer = section.footer.paragraphs[0]
     footer.text = f'SolScribe  |  Prepared {datetime.now().strftime("%d %b %Y")}'
     footer.style = 'Caption'
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    footer.add_run('  |  Page ')
+    field = OxmlElement('w:fldSimple')
+    field.set(qn('w:instr'), 'PAGE')
+    footer._p.append(field)
     document.save(str(path))
 
 
@@ -122,7 +122,7 @@ def write_pdf(path, content):
     from reportlab.lib.units import cm
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, KeepTogether
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, LongTable, TableStyle, XPreformatted
 
     font = 'Helvetica'
     bold_font = 'Helvetica-Bold'
@@ -158,20 +158,34 @@ def write_pdf(path, content):
                             topMargin=2.1*cm, bottomMargin=2.0*cm,
                             title='SolScribe document', author='SolScribe')
     story = []
-    for kind, raw in _content_lines(content):
-        if kind == 'blank':
-            story.append(Spacer(1, 5))
-            continue
-        value = html.escape(raw)
-        value = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', value)
-        if kind == 'title':
-            story.append(Paragraph(value, title_style))
-        elif kind in ('section', 'subsection'):
-            story.append(Paragraph(value, heading_style))
-        elif kind == 'bullet':
-            story.append(Paragraph('• ' + value, bullet_style))
+    def markup(children):
+        values = []
+        for text, bold, italic, code in inline_runs(children):
+            value = html.escape(text).replace('\n', '<br/>')
+            if bold: value = '<b>' + value + '</b>'
+            if italic: value = '<i>' + value + '</i>'
+            values.append(value)
+        return ''.join(values)
+    for block in blocks(content):
+        kind = block['kind']
+        if kind == 'table':
+            rows = [[Paragraph(markup(cell), body) for cell in row] for row in block['rows']]
+            columns = max(map(len, rows))
+            for row in rows:
+                row.extend([Paragraph('', body)] * (columns - len(row)))
+            table = LongTable(rows, colWidths=[doc.width / columns] * columns, repeatRows=1,
+                              splitByRow=1, splitInRow=1)
+            table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#EEECFA')),
+                                       ('GRID', (0,0), (-1,-1), .35, colors.HexColor('#D9DCEC')),
+                                       ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                                       ('LEFTPADDING', (0,0), (-1,-1), 6),
+                                       ('RIGHTPADDING', (0,0), (-1,-1), 6)]))
+            story.extend([table, Spacer(1, 9)])
+        elif kind == 'code':
+            story.append(XPreformatted(html.escape(block['text']), body))
         else:
-            story.append(Paragraph(value, body))
+            style = title_style if kind == 'heading' and block['level'] == 1 else heading_style if kind == 'heading' else bullet_style if block['prefix'] else body
+            story.append(Paragraph(html.escape(block['prefix']) + markup(block['children']), style))
 
     def decorate(canvas, pdf_doc):
         canvas.saveState()

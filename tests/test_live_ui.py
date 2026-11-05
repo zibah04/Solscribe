@@ -120,6 +120,29 @@ def test_loading_message_is_not_overwritten_by_recording_meter(window):
     window.recorder.active = False
 
 
+def test_slow_recording_stop_keeps_event_loop_responsive_and_navigation_blocked(window, monkeypatch):
+    from PySide6.QtCore import QTimer
+    install_fake_audio(monkeypatch, np.zeros(1600, dtype=np.int16), object)
+    window.live_checkbox.setChecked(False)
+    window.toggle_record()
+    stop = window.recorder.stop
+    def slow_stop():
+        time.sleep(.2)
+        return stop()
+    monkeypatch.setattr(window.recorder, 'stop', slow_stop)
+    heartbeat = []
+    window.toggle_record()
+    sid = window.session_id
+    QTimer.singleShot(10, lambda: heartbeat.append(True))
+    until(lambda: bool(heartbeat))
+    assert window._stopping_active and not window.new_btn.isEnabled()
+    window.new_session()
+    assert window.session_id == sid
+    until(lambda: not window._stopping_active)
+    assert window.new_btn.isEnabled()
+    assert window.store.get(sid)['recording_state'] == 'complete'
+
+
 def test_silence_does_not_claim_successful_captions(window, monkeypatch):
     class Model:
         def __init__(self, *args, **kwargs):

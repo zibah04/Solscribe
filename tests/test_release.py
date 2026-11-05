@@ -76,6 +76,23 @@ def test_empty_state_and_keyboard_access(window, app):
     assert window.report_btn.isEnabled() and window.export_btn.isEnabled()
 
 
+@pytest.mark.parametrize('size', [(1092, 570), (910, 470), (683, 340)])
+def test_compact_windows_keep_record_and_navigation_visible(window, app, size):
+    # Logical sizes representing a 1366x768 display with increasing scaling
+    # and space reserved for Windows title/task bars.
+    window.resize(*size)
+    window.load_demo()
+    window.focus_tab(0)
+    app.processEvents()
+    assert window.size().toTuple() == size
+    assert window.compact_toolbar.isVisible() and not window.sidebar.isVisible()
+    for control in (window.compact_record, window.capture_mode, window.mic_combo):
+        position = control.mapTo(window, control.rect().center())
+        assert control.isVisible() and window.rect().contains(position)
+    assert window.work_scroll.verticalScrollBar().maximum() > 0
+    assert window.table.viewport().height() >= 160
+
+
 def test_failed_save_keeps_edits_and_blocks_discarding_them(window, monkeypatch):
     window.load_demo()
     sid = window.session_id
@@ -167,9 +184,10 @@ def test_microphone_stop_error_still_closes_stream(tmp_path, monkeypatch):
     assert 'device unplugged' in recorder.error
 
 
-def test_startup_failure_has_a_plain_message_with_optional_details(app, monkeypatch):
+def test_startup_failure_has_a_plain_message_with_optional_details(app, monkeypatch, tmp_path):
     import app as entry
     monkeypatch.setattr(entry, 'QApplication', lambda args: app)
+    monkeypatch.setattr(entry, 'data_dir', lambda: tmp_path)
     def unavailable(): raise OSError('database is locked')
     monkeypatch.setattr(entry, 'MainWindow', unavailable)
     shown = []
@@ -178,3 +196,18 @@ def test_startup_failure_has_a_plain_message_with_optional_details(app, monkeypa
     assert len(shown) == 1
     assert 'database is locked' not in shown[0][0]
     assert 'database is locked' in shown[0][1]
+
+
+def test_second_instance_does_not_open_the_same_database(app, monkeypatch, tmp_path):
+    import app as entry
+    from PySide6.QtCore import QLockFile
+    lock = QLockFile(str(tmp_path / 'SolScribe.lock'))
+    assert lock.tryLock(0)
+    monkeypatch.setattr(entry, 'QApplication', lambda args: app)
+    monkeypatch.setattr(entry, 'data_dir', lambda: tmp_path)
+    monkeypatch.setattr(entry, 'MainWindow', lambda: pytest.fail('Second instance opened the database'))
+    shown = []
+    monkeypatch.setattr(entry.QMessageBox, 'exec', lambda box: shown.append(box.text()))
+    assert entry.main() == 0
+    assert 'existing SolScribe window' in shown[0]
+    lock.unlock()

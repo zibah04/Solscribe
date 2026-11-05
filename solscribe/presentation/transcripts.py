@@ -9,7 +9,8 @@ class TranscriptReview(QDialog):
     def __init__(self, previous, candidate, parent=None):
         super().__init__(parent)
         self.setWindowTitle('Review improved transcript')
-        self.resize(960, 600)
+        available = self.screen().availableGeometry()
+        self.resize(min(960, available.width() - 30), min(600, available.height() - 40))
         layout = QVBoxLayout(self)
         hint = QLabel('Compare the words before replacing your edits. Existing speaker names are carried across where the timing is clear. Your generated notes will be kept.')
         hint.setWordWrap(True)
@@ -55,6 +56,7 @@ class TranscriptActions:
             if item and item.text() == old:
                 item.setText(new.strip()[:200])
         self.table.blockSignals(False)
+        self.edits_changed()
         self.persist()
 
     def _transcribed(self, result):
@@ -72,6 +74,7 @@ class TranscriptActions:
             history = old.get('transcript_history', [])[-2:]
             history.append({'saved_at': timestamp(), 'segments': old['segments'], 'model': old.get('model', '')})
             values['transcript_history'] = history
+            values['reviewed_at'] = ''
         try:
             self.store.update(target_id, **values)
         except Exception as exc:
@@ -81,5 +84,5 @@ class TranscriptActions:
         if self.session_id == target_id:
             self.load_session(target_id)
         self.reload_library(select_id=target_id)
-        self.tabs.setCurrentIndex(0)
+        self.focus_tab(0)
         self.status_label.setText('Your transcript is ready. Existing notes were kept; review them against any changed words.')

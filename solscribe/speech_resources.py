@@ -1,6 +1,7 @@
 """Resource policy shared by live and final speech recognition."""
 import gc
 import os
+import logging
 
 
 def cpu_threads() -> int:
@@ -11,5 +12,10 @@ def release_model(model) -> None:
     native = getattr(model, 'model', None)
     unload = getattr(native, 'unload_model', None)
     if callable(unload):
-        unload()
+        try:
+            unload()
+        except Exception as exc:
+            # Cleanup must not mask the original result or failure. No source
+            # speech, path, or model-server response is written to logs.
+            logging.getLogger(__name__).warning('Speech model cleanup failed (%s)', type(exc).__name__)
     gc.collect()

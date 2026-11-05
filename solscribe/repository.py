@@ -15,8 +15,8 @@ from .filesystem import contained_file, write_json
 log = logging.getLogger(__name__)
 FIELDS = {'title', 'audio_path', 'duration', 'language', 'model', 'segments',
           'meeting_date', 'attendees', 'location', 'chair', 'agenda', 'summary', 'minutes',
-          'memo', 'actions', 'notes', 'updated_at', 'action_items', 'transcript_history', 'recording_state', 'recording_pid'}
-JSON_FIELDS = {'segments': [], 'action_items': [], 'transcript_history': []}
+          'memo', 'actions', 'notes', 'updated_at', 'action_items', 'transcript_history', 'recording_state', 'recording_pid', 'notes_warnings', 'reviewed_at'}
+JSON_FIELDS = {'segments': [], 'action_items': [], 'transcript_history': [], 'notes_warnings': []}
 
 
 def data_dir() -> Path:
@@ -50,7 +50,7 @@ class Store:
                     raise sqlite3.DatabaseError('Meeting database needs recovery from a backup')
                 version = connection.execute('PRAGMA user_version').fetchone()[0]
             backups = sorted(self.backups.glob('auto-*.db'))
-            if version < 3 or not backups or datetime.fromtimestamp(backups[-1].stat().st_mtime).date() != datetime.now().date():
+            if version < 4 or not backups or datetime.fromtimestamp(backups[-1].stat().st_mtime).date() != datetime.now().date():
                 self.backup_database(self.backups / f'auto-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}.db')
                 for old in sorted(self.backups.glob('auto-*.db'))[:-5]:
                     old.unlink()
@@ -66,7 +66,7 @@ class Store:
             columns = {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}
             for name, definition in {'summary': "TEXT DEFAULT ''", 'deleted_at': "TEXT DEFAULT ''",
                                      'action_items': "TEXT DEFAULT '[]'", 'transcript_history': "TEXT DEFAULT '[]'",
-                                     'recording_state': "TEXT DEFAULT ''", 'recording_pid': 'INTEGER DEFAULT 0'}.items():
+                                     'recording_state': "TEXT DEFAULT ''", 'recording_pid': 'INTEGER DEFAULT 0', 'notes_warnings': "TEXT DEFAULT '[]'", 'reviewed_at': "TEXT DEFAULT ''"}.items():
                 if name not in columns:
                     conn.execute(f'ALTER TABLE sessions ADD COLUMN {name} {definition}')
             conn.execute('''CREATE TABLE IF NOT EXISTS recordings (
@@ -87,13 +87,13 @@ class Store:
                     self._link(conn, row['id'], row['audio_path'], 'main', False, legacy=True)
             conn.execute('CREATE INDEX IF NOT EXISTS ix_sessions_updated ON sessions(updated_at DESC)')
             conn.execute('CREATE INDEX IF NOT EXISTS ix_recording_refs ON session_recordings(recording_id)')
-            conn.execute('PRAGMA user_version=3')
+            conn.execute('PRAGMA user_version=4')
         self.recover_drafts()
         self.recover_recordings()
 
     @contextmanager
     def connect(self, *, write: bool = True):
-        connection = sqlite3.connect(self.database, timeout=3, isolation_level=None)
+        connection = sqlite3.connect(self.database, timeout=.25, isolation_level=None)
         connection.row_factory = sqlite3.Row
         try:
             connection.execute('PRAGMA foreign_keys=ON')
@@ -112,12 +112,21 @@ class Store:
         if row is None:
             return None
         result = dict(row)
-        for field, default in JSON_FIELDS.items():
+        for field in JSON_FIELDS:
             try:
                 value = json.loads(result.get(field) or '[]')
-                result[field] = value if isinstance(value, list) else default.copy()
+                if not isinstance(value, list):
+                    raise ValueError('Expected a list')
+                if field in ('segments', 'action_items', 'transcript_history') and any(not isinstance(item, dict) for item in value):
+                    raise ValueError('Expected records')
+                if field == 'segments':
+                    from .transcripts import validate_segments
+                    validate_segments(value)
+                result[field] = value
             except (ValueError, TypeError):
-                result[field] = default.copy()
+                # Never turn damaged saved content into an empty editable
+                # meeting: autosave could then destroy the original evidence.
+                raise sqlite3.DataError(f'Saved {field} needs recovery; original database retained') from None
         return result
 
     def _link(self, conn, sid: str, path: str, role: str, owned: bool, *, legacy=False, offset=0.0) -> str:
@@ -169,6 +178,12 @@ class Store:
         for field in JSON_FIELDS:
             if field in values and not isinstance(values[field], list):
                 raise ValueError(f'{field} must be a list')
+        if 'segments' in values:
+            from .transcripts import validate_segments
+            validate_segments(values['segments'])
+        for field in ('action_items', 'transcript_history'):
+            if field in values and any(not isinstance(item, dict) for item in values[field]):
+                raise ValueError(f'{field} must contain records')
         # A small independent draft can survive a failed/locked DB commit.
         # If the disk cannot hold even this file, the caller retains edits in UI.
         draft = self.drafts / f'{session_id}.json'
@@ -258,6 +273,12 @@ class Store:
         if not confirm:
             raise PermissionError('Restoring a backup requires confirmation')
         restore_archive(self.root, Path(source))
+
+    def restore_database(self, source: Path, *, confirm=False):
+        from .backups import restore_database
+        if not confirm:
+            raise PermissionError('Restoring a database requires confirmation')
+        restore_database(self.root, Path(source))
 
     def recover_drafts(self):
         for path in self.drafts.glob('*.json'):

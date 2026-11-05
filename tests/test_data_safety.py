@@ -174,6 +174,42 @@ def test_recovery_rejects_non_wav_without_modifying_it(tmp_path):
     assert path.read_bytes() == before
 
 
+def test_live_process_recording_is_not_repaired_on_another_store_open(tmp_path):
+    import os
+    store = Store(tmp_path)
+    audio = wav(store.recordings / 'still-active.wav')
+    sid = store.create('Still recording', str(audio), audio_owned=True)
+    store.update(sid, recording_state='active', recording_pid=os.getpid())
+    before = audio.read_bytes()
+    reopened = Store(tmp_path)
+    assert reopened.get(sid)['recording_state'] == 'active'
+    assert audio.read_bytes() == before
+
+
+def test_raw_database_restore_quarantines_corrupt_current_database(tmp_path):
+    from solscribe.backups import restore_database
+    store = Store(tmp_path)
+    sid = store.create('Recover this meeting')
+    snapshot = store.backup_database(tmp_path / 'snapshot.db')
+    corrupt = b'This is the damaged original database'
+    store.database.write_bytes(corrupt)
+    restore_database(tmp_path, snapshot)
+    assert Store(tmp_path).get(sid)['title'] == 'Recover this meeting'
+    assert any(path.read_bytes() == corrupt for path in store.backups.glob('before-restore-*.db'))
+
+
+@pytest.mark.parametrize('content', ['{broken', '[42]', '{"unexpected": "object"}'])
+def test_damaged_saved_transcript_is_not_silently_replaced(tmp_path, content):
+    store = Store(tmp_path)
+    sid = store.create('Damaged content')
+    with store.connect() as connection:
+        connection.execute('UPDATE sessions SET segments=? WHERE id=?', (content, sid))
+    with pytest.raises(sqlite3.DataError, match='original database retained'):
+        store.get(sid)
+    with store.connect(write=False) as connection:
+        assert connection.execute('SELECT segments FROM sessions WHERE id=?', (sid,)).fetchone()[0] == content
+
+
 def test_migration_creates_a_pre_upgrade_backup_and_preserves_legacy_audio(tmp_path):
     store = Store(tmp_path)
     audio = wav(store.recordings / 'legacy.wav')

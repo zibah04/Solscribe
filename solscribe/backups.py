@@ -29,6 +29,10 @@ def validate_database(path: Path) -> None:
         columns = {row[1] for row in connection.execute('PRAGMA table_info(sessions)')}
         if not {'id', 'title', 'created_at', 'updated_at', 'audio_path', 'segments'} <= columns:
             raise ValueError('This is not a SolScribe meeting database')
+        from .repository import Store
+        connection.row_factory = sqlite3.Row
+        for row in connection.execute('SELECT * FROM sessions'):
+            Store._decode(row)
 
 
 def snapshot_database(source: Path, destination: Path) -> Path:
@@ -41,6 +45,29 @@ def snapshot_database(source: Path, destination: Path) -> Path:
                 original.backup(backup, pages=128, sleep=.02)
         validate_database(temporary)
     return destination
+
+
+def restore_database(root: Path, source: Path) -> None:
+    """Restore a local DB-only snapshot; recordings remain in place."""
+    root, source = Path(root), Path(source)
+    current = root / 'solscribe.db'
+    if current.resolve() == source.resolve():
+        raise ValueError('Choose a backup rather than the live database')
+    validate_database(source)
+    backups = root / 'backups'
+    backups.mkdir(parents=True, exist_ok=True)
+    if current.is_file():
+        wal = Path(str(current) + '-wal')
+        if wal.is_file() and wal.stat().st_size:
+            raise RuntimeError('Close other SolScribe instances before restoring')
+        preserved = backups / f'before-restore-{uuid.uuid4().hex}.db'
+        try:
+            snapshot_database(current, preserved)
+        except (sqlite3.DatabaseError, ValueError):
+            with atomic_destination(preserved) as temporary:
+                shutil.copyfile(current, temporary)
+    with atomic_destination(current) as temporary:
+        snapshot_database(source, temporary)
 
 
 def create_archive(store, destination: Path) -> Path:
