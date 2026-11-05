@@ -1,119 +1,99 @@
-# SolScribe · Meeting Intelligence Studio (Windows)
+# SolScribe
 
-**Private, offline-first LIVE speech-to-text and meeting documentation.** A native Windows 10/11 desktop app, not a website. Converts recorded conversations, meetings, lectures, voice notes and audio/video files into editable transcripts, minutes, memos, action lists and exportable documents.
+Private meeting recording, transcripts and useful notes for Windows 10/11 x64. SolScribe 0.4.0 is a **beta**: light and dark themes retain the familiar purple palette, with a simpler workspace that adapts to smaller displays.
 
-## Features · version 0.3.0
+## Get started
 
-- Record from a Windows microphone into local 16 kHz WAV, with elapsed time and audio-level indicator. **Live transcription** runs in a separate worker and adds timestamped captions as the recording continues. **Live captions appear while recording**, generally in ~2-second audio chunks plus CPU processing time. Also includes experimental Windows PC-playback capture (WASAPI loopback) for online-meeting audio.
-- Import WAV, MP3, M4A, AAC, OGG, FLAC, WEBM, MP4 and several other media formats (decode support depends on PyAV / FFmpeg).
-- Transcribe offline using **faster-whisper** (CPU int8): automatically detect language, or pick a supported language. Timestamps are kept for each transcript segment.
-- Review or edit transcript text and **manually correct speaker labels**. Click a timestamp to jump in the source recording.
-- **Summary, minutes, memo and action register** created on demand. The instant offline mode uses direct transcript excerpts and explicitly labels possible decisions/actions for verification.
-- Optional more natural, context-aware summaries and documents using **Ollama** running locally (no remote API key required). Long transcripts are condensed in chunks.
-- Edit generated documents, add meeting metadata, and automatically save changes in a private SQLite database.
-- Export **PDF, Word DOCX, TXT, Markdown, SRT subtitles, and full project JSON**.
-- Search the local project library, drag and drop recordings, or paste text. Built-in example project.
+Download `SolScribe-Windows` from the successful [Windows build workflow](https://github.com/zibah04/Solscribe/actions/workflows/windows-build.yml). Extract the artifact, run `SolScribe-Setup-0.4.0.exe`, or extract the portable ZIP and keep its whole `SolScribe` folder together. Python is included in the packaged builds. Check `SHA256SUMS.txt` and `BUILD_INFO.txt` for the exact files and source revision. These test downloads expire after 30 days; they are not a public GitHub release.
 
-## Fastest start on Windows
+1. Choose **Microphone**, **Computer audio**, or **Both sources** at the bottom. Choose the microphone there; the computer playback device is in Settings.
+2. Click **Record meeting**. With **Show words while I speak** enabled, captions arrive in roughly two-second audio batches plus model processing time. First use downloads a speech model. Your audio continues saving while it loads.
+3. Click **Stop recording**, then review the words. **Improve transcript** rereads the full recording and lets you compare before accepting changes. Existing notes stay saved.
+4. Click **Create notes**. Review the summary, minutes, memo and action items; edit them before sharing.
+5. Choose **Save a copy** for Word, PDF or text. Export also supports Markdown, SRT and project JSON.
 
-**Option A – Windows installer (when built with GitHub Actions):** download `SolScribe-Setup-0.3.0.exe` from a successful workflow artifact and install normally.
+For an existing file, use **Add a recording**, then **Create transcript**. **Paste text** starts from existing words. **Example meeting** shows saved sample text and does not listen to the microphone.
 
-**Option B – from this source ZIP:**
+## Everyday features
 
-1. Install **Python 3.11 (64-bit)** from https://www.python.org/downloads/ (select *Add Python to PATH* during installation).
-2. Extract this ZIP to a folder (for example `Documents\SolScribe`).
-3. Double-click **`run_windows.bat`**. It will set up a private Python environment, install the libraries once, and open the native desktop window.
-4. For a live meeting, ensure **Show words while I speak** is ticked, select your microphone and click **Record meeting**. Caption lines appear in the Transcript tab in chunks. Click Stop to finish. For a saved recording or voice memo, choose **Import audio / video** and then **Create transcript**.
-5. For a more accurate final transcript, click **Create transcript** after stopping (you will be asked before replacing live captions).
-6. Enter meeting details and click **Create notes**. Review your Summary, Minutes, Memo and Action items tabs, edit as needed, and export using the top-right menu.
+- CPU-only, int8 speech recognition with faster-whisper. `tiny` is the default for live captions; `base` offers a practical final-transcript starting point. Larger models use more memory and time.
+- Capture-clock timestamps, overlapping caption context, bounded queues and explicit warnings if live words fall behind. A final short speech fragment is processed after Stop.
+- Combined microphone and Windows playback capture keeps both original source WAVs and a mixed recording. Software clock alignment compensates measured clock changes; physical-device synchronization still needs validation on target hardware.
+- Editable transcript words and speaker names, timestamp playback, transcript search and bulk speaker renaming. Speaker names are manual; automatic speaker identification is not included.
+- Conservative quick notes work immediately. They quote source words, separate conditional decisions and keep missing owners/deadlines as **Unspecified**. English-language action extraction is heuristic.
+- An editable action register includes task, owner, due date, status and source evidence. Double-click its source time to inspect the quote or navigate to the transcript. The register and written action notes remain separately editable.
+- Draft review checkboxes clear after edits. Source checks help review AI output but cannot prove its factual accuracy.
+- Automatic saving, recoverable meeting trash, explicit audio ownership, backup/restore and recovery drafts protect existing work.
+- The sidebar gives way to a compact navigation bar on small windows. The main workspace scrolls; recording controls remain visible. Appearance is available in Settings in either layout.
 
-The initial dependency installation and **first download of each Whisper model** require internet access. The live and full-transcription buttons may each use a selected Whisper model; choose `tiny`/`base` for responsive live captions. After the model has downloaded, live captions and standard transcription are completely local. No paid API keys are required. A computer with 8 GB RAM should start with `tiny`, `base` or `small`; `medium` / `large-v3` can be very slow or run out of memory on CPU.
+## Optional polished writing
 
-### Optional: better local AI minutes
+Quick notes need no additional service. Polished notes use [Ollama](https://ollama.com/) on this computer at `127.0.0.1:11434`. Install and run Ollama separately, install a suitable small model, then enter its name under **Settings → Advanced writing setup**. SolScribe checks that the model is available; it never downloads an Ollama model automatically. Avoid large writing models on an 8 GB PC.
 
-Install Ollama from https://ollama.com/ and in Windows Terminal run:
+The client supports bounded streaming responses, cancellation, context limits and hierarchical condensation of long transcripts. A missing service or malformed response transparently falls back to quick notes. Cancel keeps existing documents. Transcript content is treated as untrusted source data in prompts. AI can still invent or misinterpret details: verify names, decisions, dates and assignments against the original words.
 
-```powershell
-ollama pull llama3.2
-```
+## Your files and recovery
 
-Keep Ollama running. Inside SolScribe open **Settings**, select **Polished notes**, then expand **Advanced writing setup**. Leave the model field as `llama3.2` (or use another installed model), and click Create notes. Minutes, memo and actions are produced with a fact-preserving prompt and remain editable. For very long meetings, the transcript is condensed in chunks. Even AI-generated notes must be reviewed against source audio.
+The installed and portable apps share `%LOCALAPPDATA%\SolScribe` for this Windows account:
 
-### Make a portable Windows EXE
+| Location | Contents |
+| --- | --- |
+| `solscribe.db` | Meetings, transcripts, notes, actions and recording references |
+| `recordings` | Audio newly recorded by SolScribe, including separate combined-capture tracks |
+| `models` | Speech model cache |
+| `backups` | Automatic database snapshots and preserved databases from restores |
+| `drafts` | Independent recovery files retained if a database write fails |
 
-With Python 3.11 installed, double-click **`build_windows.bat`**. When it finishes, run:
+Imported files are linked in place. Keep the original files. Legacy recordings have conservative ownership even if located inside `recordings`; upgrading never automatically claims or deletes them.
 
-`dist\SolScribe\SolScribe.exe`
+**Delete meeting** moves it to trash without deleting audio. Settings provides trash recovery, permanently removing trashed metadata, and a separate confirmed operation for unused SolScribe-owned audio. Audio referenced by any active or trashed meeting is protected. Uninstall removes the application, not the meeting library.
 
-Keep **all files in `dist\SolScribe`** together; it is a bundled directory, not a single stand-alone EXE. The EXE is built **on Windows**, not cross-compiled from Linux.
+Use **Settings → Back up meetings** for a ZIP containing a consistent database snapshot and owned audio with checksums. Imported audio stays linked and is not copied into that archive. Automatic snapshots preserve the latest five database copies; they do not copy audio. Keep periodic full archives on another drive.
 
-### Get a one-click installer automatically using GitHub
+Restore accepts a backup ZIP or database snapshot (`.db`) and preserves the previous database. DB-only restores require the original audio paths to remain accessible. Invalid archives and damaged transcript structures are rejected before replacement. If startup fails because the database is damaged, the startup dialog offers backup recovery. Failed writes keep edits open and retain a draft when disk space permits. Interrupted, known-owned PCM recordings can recover complete frames already written; audio never written to disk cannot be reconstructed.
 
-Upload this project to a new GitHub repository, **including the hidden `.github` directory**. Select the **Actions → Build SolScribe for Windows → Run workflow**. After the workflow completes, open its run and download the **SolScribe-Windows** artifact, which contains a portable app ZIP and an installer `.exe`. GitHub workflow artifacts expire after the retention period, so store a copy for distribution.
+Only one application instance may open a meeting library at a time. Close older versions before upgrading or restoring.
 
-## Release 0.3.0
+## Privacy and limits
 
-Switch between Light and Dark with **Appearance** at the bottom left. Both keep SolScribe's purple palette and your preference is saved. The workspace fits laptop screens, starts with helpful guidance and returns to your last meeting.
+Audio and transcript processing is local by default. Speech models require a first-use download from the model provider; subsequent use can be offline. Optional Ollama traffic is local-only. There is no telemetry, automatic upload, cloud account or mandatory API key.
 
-Record or add a recording, review the transcript, create notes, then save a copy. Quick notes work immediately; polished notes use an optional helper. If that helper is unavailable, SolScribe makes quick notes instead and explains what happened.
+The database, WAVs, backups and drafts are **not encrypted by SolScribe**. Anyone with access to the Windows profile can read them. Use Windows account protection and BitLocker/device encryption where available; secure exported copies too. An in-app encrypted vault is deferred until key recovery and migration can be designed without locking people out of existing files.
 
-See [START_HERE.txt](START_HERE.txt) for the user guide and [RELEASE_NOTES.md](RELEASE_NOTES.md) for validation and public-release limits. Source builds and the installer are unsigned.
+The build is unsigned unless `SIGNING_STATUS.txt` verifies otherwise. No signing certificate is supplied. Keep Windows security protections enabled. Physical audio reliability, mixed-source drift, multilingual accuracy, screen-reader behavior and 8 GB laptop performance need the checks in [Windows acceptance](docs/WINDOWS_ACCEPTANCE.md) before a wider release. Live captions are provisional; driver/device failures can cause missing audio, with warnings where detected. No automatic updates, syncing, translation or diarization are included.
 
-## Layout and live captions
+## Keyboard access
 
-- The transcript has its own large workspace. Meeting metadata is in **Meeting details**; final-transcription model and language are in **Settings**.
-- **Fast captions** in Settings uses the `tiny` speech model for responsiveness. Captions update after roughly two seconds of audio plus recognition time; this is not instant word-by-word dictation.
-- Loading/download, recognition, and failure messages stay visible above the transcript. First use needs an internet connection to download the selected model. The recording is still saved during loading.
-- **Example meeting** opens saved sample text; it does not listen to your microphone. To see your own speech, select the correct input and click **Record meeting** with the checkbox enabled. Watch the input-level meter.
-- The final short audio tail is processed on Stop. Wait for queued captions to finish. Use **Create transcript** after recording to improve accuracy with the final model.
+Ctrl+N new meeting · Ctrl+O add recording · Ctrl+R record/stop · Ctrl+S save · Ctrl+E save a copy · Ctrl+, settings. Tab navigates controls; focus outlines are visible in both themes. Some complex-script and right-to-left exports need additional font/layout validation.
 
-## Privacy and important limitations
+## Develop and verify
 
-- By default SolScribe never sends audio or transcripts to cloud AI providers. The model downloads once; local Ollama requests go to `127.0.0.1`.
-- Imported recordings are **linked in place**, not copied, so keep the original file. Microphone recordings are stored at `%LOCALAPPDATA%\SolScribe\recordings`.
-- All session records, notes and transcripts reside in `%LOCALAPPDATA%\SolScribe\solscribe.db`; Whisper models are cached under `%LOCALAPPDATA%\SolScribe\models`.
-- PC audio (loopback) and microphone are separate capture choices; **simultaneous microphone + system-audio mixing is not implemented**. Recording online meetings with a headset can therefore omit your own voice when you select PC audio.
-- The app does **not automatically identify speakers**. Editable generic speaker labels are intentional, to avoid falsely claiming diarization.
-- **Live transcription is implemented**: it produces provisional captions in short audio chunks while recording. It is *near-live*, not instant word-by-word captions; actual delay depends on processor and model. On a slow CPU, captions may lag or omit audio when the queue fills. The **full original recording remains intact**; use **Improve transcript** after recording for completeness and better word boundaries.
-- Audio quality, background noise, overlapping speakers and accents can reduce accuracy. Live captions are not a substitute for independently verified official minutes.
-- The simple offline drafting mode is an **extractive draft** (verbatim excerpts), not deep semantic understanding. For polished contextual reports, choose Ollama.
-- The app is **not** a certified confidential-records management system: anyone with access to your Windows profile or database files may read them; protect your PC and secure your backups.
-- Obtain consent and follow applicable privacy/recording laws before recording a meeting.
-
-## Keyboard shortcuts
-
-Ctrl+N: new session · Ctrl+O: import audio · Ctrl+S: save · Ctrl+E: export · Ctrl+R: start/stop recording (uses the live-caption checkbox).
-
-## Developer commands
+Use Python **3.11 x64** on Windows:
 
 ```powershell
 py -3.11 -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install -r requirements-dev.txt
+.venv\Scripts\python -m pip check
+.venv\Scripts\python -m pytest -q --junitxml=windows-tests.xml
+.venv\Scripts\ruff check --select F821,F822,F823 solscribe scripts app.py
 .venv\Scripts\python app.py
-.venv\Scripts\python -m pip install pytest
-.venv\Scripts\python -m pytest -q
 ```
+
+`run_windows.bat` sets up a source installation; `build_windows.bat` creates the executable. The Actions workflow uses the same x64 virtual environment for tests and packaging, checks 100/125/150/200% Qt scaling, runs real speech recognition from synthetic spoken test audio in both source and packaged builds, then exercises migration, installation, removal and reinstallation. It uploads tests, measurements, dependencies, checksums and build identity. Qt scaling tests are not physical Windows display testing.
+
+For reproducible measurements, run `python scripts/benchmark.py --output performance.json`. It isolates temporary data and measures startup, RSS, 10,000-row loading, note generation and a synthetic 90-minute stream. It uses a fake recognizer for buffer retention; it is not a speech-speed benchmark. `python scripts/smoke_live.py live-smoke.wav` measures actual recognition on a 16 kHz mono PCM16 test file containing “meeting” and “report”. Its prequeued input timings are not physical microphone latency.
+
+Optional Authenticode preparation uses `scripts/sign_windows.ps1`. A legitimate certificate and protected private key must already be provisioned in the runner's CurrentUser certificate store; set repository variable `WINDOWS_SIGNING_THUMBPRINT`. Configured signing failures fail the build. A future signing runner/service must protect that key; no secrets belong in source. Inno's generated uninstaller is not signed by this preparation.
+
+See [architecture](docs/ARCHITECTURE.md), [release notes](RELEASE_NOTES.md) and [engineering evidence](docs/ENGINEERING_REPORT.md). Changes are prepared on `codex/solscribe-040-remediation`; the functional `codex/windows-build-v0.2` history is preserved. Review and merge the PR before making `main` the release source. This work does not merge or publish a public release.
 
 ## Troubleshooting
 
-**App does not start**: confirm 64-bit Python 3.11 and re-run `run_windows.bat` with an internet connection. If you installed another major Python version, run the above developer commands with Python 3.11.
+- **No words yet:** wait for the speech download and initialization, check the level meter and device selection, use `tiny` for live captions. Imported-file transcription uses Create transcript instead.
+- **No microphone:** allow desktop microphone access in Windows Privacy settings and check device drivers. Refresh by reopening the app after connecting a device.
+- **No remote participants:** choose Computer audio or Both sources and select the actual playback output in Settings. Bluetooth profile changes may change the available device.
+- **Writing helper unavailable:** quick notes remain usable. Confirm Ollama and the chosen model are installed and running for polished writing.
+- **Save fails:** free disk space/check folder access; keep the window open. Recovery drafts are retained where possible.
+- **A file will not decode:** use a trusted converter to make WAV, MP3 or M4A, then add it again. Codec support depends on PyAV/FFmpeg.
 
-**First transcription stuck on model loading**: the chosen model may still be downloading; test with `tiny` or `base`. A firewall may block access to Hugging Face models. If the model is already cached, internet is no longer required.
-
-**Live captions do not show up**: wait for the first speech-model download/initialization and about two seconds of audio plus processing. Try `tiny` for faster results on older laptops, or `base` for better accuracy. Live captions require a functioning microphone/PC-audio input and will not show during imported-file transcription, which uses the **Create transcript** button.
-
-**Mic not available**: enable Windows *Settings → Privacy & security → Microphone* and *Let desktop apps access your microphone*. Change the mic in SolScribe's bottom-right dropdown. For capturing other participants in a Teams/Zoom meeting, choose the experimental **PC audio: ...** device from that same dropdown; this captures computer playback only.
-
-**Video/audio cannot be decoded**: convert it to WAV, MP3 or M4A using a trusted converter, then import the resulting file.
-
-**Ollama can't connect**: check that the Ollama application is running and the selected model has been pulled. The default service listens on `http://127.0.0.1:11434`.
-
-**Windows SmartScreen warning**: unsigned custom EXEs can trigger SmartScreen. Builds are not code-signed; source is provided for inspection. Don't disable antivirus protections globally.
-
-## Roadmap (not implemented in this version)
-
-Automatic speaker diarization, combined microphone+system-audio mixing, multilingual translation, calendar integration, cross-device syncing, encrypted local vault, user-managed cloud-provider transcription, and installer code signing.
-
-## License
-
-MIT. See `LICENSE`.
+MIT licensed; see [LICENSE](LICENSE).

@@ -1,5 +1,5 @@
 #define MyAppName "SolScribe"
-#define MyAppVersion "0.3.0"
+#define MyAppVersion "0.4.0"
 #define MyAppExeName "SolScribe.exe"
 
 [Setup]
@@ -12,7 +12,7 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=Output
-OutputBaseFilename=SolScribe-Setup-0.3.0
+OutputBaseFilename=SolScribe-Setup-0.4.0
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

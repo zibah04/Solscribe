@@ -1,32 +1,28 @@
-# SolScribe 0.3.0
+# SolScribe 0.4.0 beta
 
-## A calmer workspace
+This version improves the existing private Windows meeting app while retaining the purple palette, light/dark themes, editable transcripts, four note types and all six export formats.
 
-- Light and dark themes, with familiar purple accents. Change Appearance at the bottom left; your choice is remembered.
-- A welcoming first-use screen, clearer next steps, quieter controls and more room for your words.
-- Formatted, editable notes and familiar Word/PDF saving.
-- Keyboard access, named controls, visible focus states and readable text contrast in both themes.
-- The app returns to your last meeting. Meeting details and optional writing setup stay out of the main workflow.
+## Changes
 
-## Reliability
+- Recoverable meeting trash; separate confirmed deletion of unused owned audio. Shared/imported/legacy recordings remain protected.
+- Transactional schema migration, pre-upgrade/daily database snapshots, full backup ZIPs with checksums, staged restore, independent recovery drafts and interrupted PCM WAV recovery.
+- Capture-clock live captions with overlapping context, FIR resampling, bounded queues and explicit skipped-caption warnings. Recorded timelines retain gaps instead of shifting later words earlier.
+- Microphone, computer playback and combined capture. Combined mode preserves both source WAVs plus a mixed file, with software clock alignment and drift compensation.
+- Compare an improved transcript before replacing manual words; retain speaker corrections where timing is clear and preserve existing documents. Bulk speaker renaming.
+- Conservative source-grounded English action extraction, editable action register with evidence, review state and draft checks.
+- Bounded/cancellable local writing requests, model availability checks, long-source condensation and transparent quick-note fallback.
+- Smaller UI controllers, large-transcript rendering improvements, responsive recording shutdown and backup jobs. Compact navigation and a scrollable workspace support small scaled windows.
+- Shared CommonMark parsing for rich exports preserves literal symbols, code, links and tables. Word/PDF page numbering, Unicode fonts and multi-page table support.
+- Windows x64 build validation includes source and packaged speech recognition, 100/125/150/200% Qt scaling, legacy-data migration and install/remove/reinstall preservation. Optional signing preparation fails closed when configured.
 
-- Failed exports leave existing destination files intact.
-- Unsaved edits remain open if the meeting database cannot be written; starting another meeting or closing will not silently discard them.
-- Microphone start/stop failures clean up streams and recording threads.
-- Windows-safe export names and correctly numbered subtitle files.
-- Quick notes remain available if the optional writing helper is missing or unavailable.
+## Verification evidence
 
-## Validation and package contents
+See `docs/ENGINEERING_REPORT.md` for executed checks and limitations. Each successful workflow artifact records the source SHA, build number, exact dependencies, tests, measurements, SHA256 checksums and Authenticode status. Validation artifacts are retained even if a later packaging step fails. Downloads expire after 30 days.
 
-The release workflow runs automated regressions, theme/layout checks at 100%, 150% and 200% scaling, real speech recognition, packaged-app startup in both themes, and installer launch/removal checks that preserve an existing meeting and recording.
+## Known limits
 
-The download includes the installer, portable ZIP, quick-start guide, license, dependency versions, test results and SHA256 checksums. The source commit and build number are recorded in BUILD_INFO.txt. Windows installer and file properties identify version 0.3.0.
+Physical microphone/loopback synchronization, disconnection behavior and long-duration recording need target-device checks. The 8 GB CPU-only target is not certified by offscreen/cloud tests. System capture uses software timing; driver failures can lose samples, and warnings cannot reconstruct them.
 
-## Practical limits
+Live captions are provisional two-second batches plus processing. First use downloads a speech model; native model initialization/decoding cancellation remains cooperative. AI notes and English heuristics need human review. A real Ollama model's report quality has not been independently established here.
 
-- This build is unsigned. Public distribution with a verified publisher name requires a code-signing certificate, which is not included.
-- First use needs internet for a speech download; recorded speech is processed on your PC. Polished rewriting additionally needs the optional local writing helper.
-- Live words arrive in short batches with processing delay. Always review transcripts and meeting notes for accuracy.
-- Physical microphone quality and Windows playback capture depend on your hardware, drivers and permissions. A final check on the intended devices remains necessary before public release.
-- Simultaneous microphone/playback mixing and automatic speaker identification are not included. Speaker labels can be edited.
-- Keep a copy of the downloaded release; GitHub workflow downloads are retained for 30 days.
+No automatic speaker identification, translation, encrypted vault, syncing or automatic updater is included. Saved files and backups are unencrypted. The generated uninstaller is not covered by the optional signing preparation; no signing certificate is supplied. Complex-script/RTL export layout and real screen-reader testing remain pending. Use `docs/WINDOWS_ACCEPTANCE.md` before a public release.
