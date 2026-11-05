@@ -4,7 +4,7 @@ Private meeting recording, transcripts and useful notes for Windows 10/11 x64. S
 
 ## Get started
 
-Download `SolScribe-Windows` from the successful [Windows build workflow](https://github.com/zibah04/Solscribe/actions/workflows/windows-build.yml). Extract the artifact, run `SolScribe-Setup-0.4.0.exe`, or extract the portable ZIP and keep its whole `SolScribe` folder together. Python is included in the packaged builds. Check `SHA256SUMS.txt` and `BUILD_INFO.txt` for the exact files and source revision. These test downloads expire after 30 days; they are not a public GitHub release.
+[Download the Windows installer](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Setup-0.4.0.exe) (113 MB) and run it. No GitHub sign-in or ZIP extraction is needed. A [portable ZIP](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Portable-Windows.zip) (170 MB) is also available; extract and keep its whole `SolScribe` folder together. Python is bundled. [Release notes, checksums and build identity](https://github.com/zibah04/Solscribe/releases/tag/v0.4.0-beta.1) accompany the unsigned beta. These release downloads do not have the 30-day expiry of Actions artifacts.
 
 1. Choose **Microphone**, **Computer audio**, or **Both sources** at the bottom. Choose the microphone there; the computer playback device is in Settings.
 2. Click **Record meeting**. With **Show words while I speak** enabled, captions arrive in roughly two-second audio batches plus model processing time. First use downloads a speech model. Your audio continues saving while it loads.
@@ -85,7 +85,7 @@ For reproducible measurements, run `python scripts/benchmark.py --output perform
 
 Optional Authenticode preparation uses `scripts/sign_windows.ps1`. A legitimate certificate and protected private key must already be provisioned in the runner's CurrentUser certificate store; set repository variable `WINDOWS_SIGNING_THUMBPRINT`. Configured signing failures fail the build. A future signing runner/service must protect that key; no secrets belong in source. Inno's generated uninstaller is not signed by this preparation.
 
-See [architecture](docs/ARCHITECTURE.md), [release notes](RELEASE_NOTES.md) and [engineering evidence](docs/ENGINEERING_REPORT.md). Changes are prepared on `codex/solscribe-040-remediation`; the functional `codex/windows-build-v0.2` history is preserved. Review and merge the PR before making `main` the release source. This work does not merge or publish a public release.
+See [architecture](docs/ARCHITECTURE.md), [release notes](RELEASE_NOTES.md) and [engineering evidence](docs/ENGINEERING_REPORT.md). Changes are prepared on `codex/solscribe-040-remediation`; the functional `codex/windows-build-v0.2` history is preserved. Review and merge the PR before making `main` the release source. The [public beta download](https://github.com/zibah04/Solscribe/releases/tag/v0.4.0-beta.1) was published with explicit user approval on 5 November 2026. Main has not been merged.
 
 ## Troubleshooting
 

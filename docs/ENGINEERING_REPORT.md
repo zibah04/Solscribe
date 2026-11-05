@@ -1,6 +1,6 @@
 # SolScribe 0.4.0 engineering evidence
 
-Status: validated beta build on `codex/solscribe-040-remediation`. No merge, public release or environment publication is performed by this work. The functional 0.3 source branch and its history are preserved.
+Status: validated beta build on `codex/solscribe-040-remediation`. The public beta download was published with explicit user approval on 5 November 2026. Main and environment configuration were not published or merged by this work. The functional 0.3 source branch and its history are preserved.
 
 ## A. Implemented improvements
 
@@ -81,6 +81,9 @@ See [Windows acceptance](WINDOWS_ACCEPTANCE.md) for reproducible physical-device
 
 ## G. Release artifacts
 
+- [Direct Windows installer](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Setup-0.4.0.exe) — 113 MB; no GitHub sign-in or archive extraction required.
+- [Direct portable ZIP](https://github.com/zibah04/Solscribe/releases/download/v0.4.0-beta.1/SolScribe-Portable-Windows.zip) — 170 MB.
+- [Public beta release](https://github.com/zibah04/Solscribe/releases/tag/v0.4.0-beta.1) — published with user approval on 5 November 2026, with unchanged verified binaries. Release assets do not have Actions retention expiry.
 - [Download Windows bundle](https://github.com/zibah04/Solscribe/actions/runs/42001168415/artifacts/13403061934) — 282.5 MB; contains `Output/SolScribe-Setup-0.4.0.exe`, `SolScribe-Portable-Windows.zip`, guides, dependency/build identity, signing status and checksums.
 - [Download validation evidence](https://github.com/zibah04/Solscribe/actions/runs/42001168415/artifacts/13401784822) — JUnit/scaling reports, console output, install/uninstall logs, packaging warnings and measurements.
 - [SHA256 sums](validation/SHA256SUMS.txt): installer `56804ea0291ca01f6824247a398aea0b6cdcc99b781282e27fbb348721e50efa`; portable ZIP `8062926cedcd1da9894cc1ef87788f20cf899586d173a4fdbc3d5d39610d5d11`.
@@ -88,7 +91,7 @@ See [Windows acceptance](WINDOWS_ACCEPTANCE.md) for reproducible physical-device
 - Source branch: [`codex/solscribe-040-remediation`](https://github.com/zibah04/Solscribe/tree/codex/solscribe-040-remediation). Built commit: `b551cf5da1e8bc0d75065c98f1a3b1406dd5ea85`; subsequent evidence documentation does not change application code.
 - [Draft PR #1 targeting main](https://github.com/zibah04/Solscribe/pull/1).
 
-Extract the Windows bundle and run its installer, or extract the portable ZIP and keep the whole application folder together. Downloads have 30-day Actions retention and may require GitHub sign-in. No merge, public release or environment publication has occurred. Treat this build as unsigned; the download includes its Authenticode status, and no signing credential was supplied by this task.
+Extract the Windows bundle and run its installer, or extract the portable ZIP and keep the whole application folder together. The original Actions artifacts have 30-day retention and may require GitHub sign-in; use the direct release downloads above for clients. No main merge or environment publication has occurred. Treat this build as unsigned; the download includes its Authenticode status, and no signing credential was supplied by this task.
 
 ## H. Engineering verdict
 
