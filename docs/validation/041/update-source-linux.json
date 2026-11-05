@@ -1,0 +1,10 @@
+{
+  "tag": "v0.4.0-beta.1",
+  "bytes": 113042515,
+  "sha256": "56804ea0291ca01f6824247a398aea0b6cdcc99b781282e27fbb348721e50efa",
+  "check_seconds": 0.9500592350013903,
+  "verified": true,
+  "total_seconds": 6.655726766999578,
+  "scope": "Real public HTTPS metadata and installer download; installer verified but not executed.",
+  "errors": []
+}

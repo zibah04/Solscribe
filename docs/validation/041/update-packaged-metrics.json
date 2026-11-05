@@ -1,0 +1,11 @@
+{
+  "tag": "v0.4.0-beta.1",
+  "bytes": 113042515,
+  "sha256": "56804ea0291ca01f6824247a398aea0b6cdcc99b781282e27fbb348721e50efa",
+  "check_seconds": 0.32633129999999255,
+  "windows_internet_origin_preserved": true,
+  "verified": true,
+  "total_seconds": 3.876572499999952,
+  "scope": "Real public HTTPS metadata and installer download; installer verified but not executed.",
+  "errors": []
+}
