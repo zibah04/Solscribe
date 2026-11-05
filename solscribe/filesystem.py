@@ -15,7 +15,8 @@ def atomic_destination(destination: Path):
     temporary = Path(name)
     try:
         yield temporary
-        with temporary.open('rb') as stream:
+        # Windows _commit (used by os.fsync) requires a writable descriptor.
+        with temporary.open('r+b') as stream:
             os.fsync(stream.fileno())
         os.replace(temporary, destination)
     finally:

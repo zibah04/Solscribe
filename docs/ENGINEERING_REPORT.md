@@ -22,6 +22,7 @@ The existing purple light/dark appearance remains, with compact navigation and s
 | Qt completion signals could arrive after a worker was already no longer running | Busy flags held through UI finished handling; protected navigation and shutdown |
 | Large transcript loading resized every row; small windows hid useful workspace | Preallocated rows, visible-row sizing, compact controls and scrollable content |
 | Rich-export conversion removed meaningful punctuation/markup content | Shared Markdown AST, literal/code/link/table handling and paginated document renderers |
+| Windows rejected syncing a read-only temporary-file descriptor | Reopen staged output with write access before fsync; retain the atomic replacement and failure cleanup |
 | SQLite transaction contexts left backup handles open on Windows | Explicit connection closing before atomic replacement, with a regression enforcing the file-handle contract |
 | Saved malformed JSON was interpreted as empty content | Reject damaged content without overwriting original DB; recovery route preserves it |
 

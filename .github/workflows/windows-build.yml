@@ -25,9 +25,9 @@ jobs:
       contents: read
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Python 3.11 x64
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
           architecture: 'x64'
@@ -83,6 +83,9 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_SCALE_FACTOR: '1.5'
         run: |
+          # Prevent source Python/venv directories from masking missing bundled DLLs.
+          $env:PATH = "$env:WINDIR\system32;$env:WINDIR"
+          Remove-Item Env:PYTHONHOME, Env:PYTHONPATH -ErrorAction SilentlyContinue
           $app = Start-Process 'dist/SolScribe/SolScribe.exe' -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Packaged application timed out' }
           if ($app.ExitCode -ne 0) { throw "Packaged application failed: $($app.ExitCode)" }
@@ -147,7 +150,7 @@ jobs:
         run: python scripts/summarize_validation.py
       - name: Upload test and measurement evidence even on failure
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: SolScribe-Validation
           path: |
@@ -159,7 +162,7 @@ jobs:
             build/SolScribe/warn-SolScribe.txt
           retention-days: 30
       - name: Upload Windows installer and portable build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: SolScribe-Windows
           path: |
