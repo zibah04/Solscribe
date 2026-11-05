@@ -51,7 +51,7 @@ class WindowLayout:
         brand_col = QVBoxLayout()
         brand_col.setSpacing(1)
         brand_col.addWidget(self._label('SolScribe', 'Brand'))
-        brand_col.addWidget(self._label('MEETING STUDIO', 'BrandTag'))
+        brand_col.addWidget(self._label('NOTES STUDIO', 'BrandTag'))
         brand_row.addLayout(brand_col)
         brand_row.addStretch(1)
         sidebar.addLayout(brand_row)
@@ -109,7 +109,7 @@ class WindowLayout:
         compact.setContentsMargins(10, 6, 10, 6)
         compact.setSpacing(6)
         self.compact_controls = []
-        for label, callback, original in [('Meetings', self.show_meetings, self.library),
+        for label, callback, original in [('Library', self.show_meetings, self.library),
                                            ('New', self.new_session, self.new_btn),
                                            ('Add file', self.import_audio, self.import_btn),
                                            ('Paste', self.paste_text, self.paste_btn)]:
@@ -465,7 +465,7 @@ class WindowLayout:
         advanced_toggle.toggled.connect(lambda checked: advanced_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow))
         settings_layout.addWidget(advanced)
         storage_row = QHBoxLayout()
-        for label, callback in [('Back up meetings', self.backup_meetings), ('Restore backup', self.restore_meetings), ('Trash', self.show_trash)]:
+        for label, callback in [('Back up library', self.backup_meetings), ('Restore backup', self.restore_meetings), ('Trash', self.show_trash)]:
             button = self._button(label, 'Plain')
             button.clicked.connect(callback)
             storage_row.addWidget(button)

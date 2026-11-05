@@ -41,7 +41,7 @@ class RecordingActions:
         if self.current_session and (self.current_session.get('audio_path') or self.current_session.get('segments')):
             if not self.new_session():
                 return
-            self.title_edit.setText('Meeting · ' + datetime.now().strftime('%d %b %Y %H:%M'))
+            self.title_edit.setText(('Lecture · ' if self.session_type() == 'lecture' else 'Meeting · ') + datetime.now().strftime('%d %b %Y %H:%M'))
             self.persist()
         if not self.persist():
             return
@@ -72,7 +72,7 @@ class RecordingActions:
                               model='live' if live_enabled else '', audio_owned=True, recording_state='active', recording_pid=os.getpid(),
                               source_tracks=getattr(self.recorder, 'source_tracks', None))
             self.current_session = self.store.get(self.session_id)
-            self.audio_name.setText('Recording this meeting…')
+            self.audio_name.setText('Recording this lecture…' if self.session_type() == 'lecture' else 'Recording this meeting…')
             self.playback_controls.hide()
             if live_enabled:
                 model = self.live_model_combo.currentData()

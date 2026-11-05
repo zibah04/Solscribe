@@ -280,3 +280,24 @@ def test_lecture_mode_at_laptop_sizes(window, app, size, theme):
     window.work_scroll.ensureWidgetVisible(window.study_tabs)
     assert window.study_edit.viewport().height() >= 100
     assert window.credit_label.isVisible()
+
+
+def test_recording_after_lecture_sample_keeps_purpose_and_original(window, monkeypatch):
+    import numpy as np
+    from test_live_ui import install_fake_audio
+    window.mode_combo.setCurrentIndex(1)
+    window.load_demo()
+    original_id = window.session_id
+    original = copy.deepcopy(window.current_session['segments'])
+    install_fake_audio(monkeypatch, np.zeros(1600, dtype=np.int16), object)
+    window.live_checkbox.setChecked(False)
+    window.toggle_record()
+    assert window.record_timer.isActive()
+    assert not window.mode_combo.isEnabled()
+    assert window.current_session['session_type'] == 'lecture'
+    assert window.current_session['title'].startswith('Lecture · ')
+    assert window.session_id != original_id
+    window.toggle_record()
+    until(lambda: not window._stopping_active)
+    assert window.record_btn.text() == 'Record lecture'
+    assert window.store.get(original_id)['segments'] == original

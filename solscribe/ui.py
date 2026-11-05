@@ -294,7 +294,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
         self.table.setUpdatesEnabled(True)
         self.resize_visible_rows()
         self.search_transcript.clear()
-        self.caption_status.setText('Your words are saved · record another meeting or create notes' if session['segments'] else 'Your transcript will appear below')
+        self.caption_status.setText('Your words are saved · create notes or start a new recording' if session['segments'] else 'Your transcript will appear below')
         for name, field in [('Summary', 'summary'), ('Minutes', 'minutes'), ('Memo', 'memo'), ('Action items', 'actions')]:
             self.doc_edits[name].setMarkdown(session.get(field) or '')
         self.load_actions(session.get('action_items', []))
@@ -343,7 +343,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
             self.empty_title.setText('Your recording is ready.')
             self.empty_hint.setText('Choose Create transcript to turn the recording into words you can review and edit.')
         else:
-            self.empty_title.setText('Every meeting, clearly captured.')
+            self.empty_title.setText('Capture a lecture, one idea at a time.' if self.session_type() == 'lecture' else 'Every meeting, clearly captured.')
             self.empty_hint.setText('Record a conversation, add an audio or video file, or paste notes to get started.')
         for control in (self.capture_mode, self.system_combo, self.mic_combo, self.live_checkbox, self.live_model_combo, self.language_combo):
             control.setEnabled(not recording and not live_working)
@@ -379,7 +379,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
         elif has_audio:
             hint = 'Next: click Create transcript to see the words in your recording.'
         else:
-            hint = 'Record a meeting or add a recording to begin.'
+            hint = 'Record or add a recording to begin.'
         if self._save_error:
             hint = 'Changes are not saved yet. Check available disk space and try again.'
         self.flow_hint.setText(hint)
@@ -432,7 +432,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
         self.search_library.clear()
         self.reload_library(select_id=session_id)
         self.caption_status.setText('Example lecture · saved sample text, not live audio.' if self.session_type() == 'lecture' else 'Example meeting · sample text. Click Record meeting to capture your own words.')
-        self.statusBar().showMessage('Example meeting loaded. Try Create notes.', 8000)
+        self.statusBar().showMessage('Example lecture loaded. Try Create study notes.' if self.session_type() == 'lecture' else 'Example meeting loaded. Try Create notes.', 8000)
 
     def import_audio(self, path=None):
         if self._is_busy():
@@ -463,7 +463,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
         if self.record_timer.isActive():
             return
         content, ok = QInputDialog.getMultiLineText(self, 'Paste existing words / notes',
-                            'Paste a transcript or meeting notes here:')
+                            'Paste a transcript or notes here:')
         if not ok or not content.strip():
             return
         if not self.persist():
@@ -632,7 +632,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
                              'end': float(clock.data(Qt.UserRole + 1) or 0) if clock else 0.0,
                              'speaker': self.table.item(row, 1).text() if self.table.item(row, 1) else 'Speaker',
                              'text': self.table.item(row, 2).text() if self.table.item(row, 2) else ''})
-        new_title = self.title_edit.text().strip() or 'Untitled meeting'
+        new_title = self.title_edit.text().strip() or ('Untitled lecture' if self.session_type() == 'lecture' else 'Untitled meeting')
         try:
             self.store.update(self.session_id, title=new_title, segments=segments,
                               session_type=self.session_type(), study_notes=self.study_edit.toMarkdown().strip(), study_items=self.study_items,
@@ -685,7 +685,7 @@ class MainWindow(WindowLayout, StudyTools, HelpUpdates, ActionRegister, Transcri
         action.triggered.connect(lambda: self.export('md', section))
         action = more.addAction('Subtitles (.srt)')
         action.triggered.connect(lambda checked=False: self.export('srt', 'Transcript'))
-        action = more.addAction('All meeting data (.json)')
+        action = more.addAction('All recording data (.json)')
         action.triggered.connect(lambda checked=False: self.export('json', 'Transcript'))
         menu.exec(self.export_btn.mapToGlobal(self.export_btn.rect().bottomLeft()))
 

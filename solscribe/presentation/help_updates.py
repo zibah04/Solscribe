@@ -113,7 +113,7 @@ class HelpUpdates:
             if guide.practice.isChecked():
                 self.load_demo()
                 self.focus_tab(0)
-                self.statusBar().showMessage('Sample text is ready. Try Create notes, then Save a copy. Record meeting captures your own speech.', 15000)
+                self.statusBar().showMessage('Sample text is ready. Create notes or study notes, then Save a copy. Record captures your own speech.', 15000)
         self._guide = None
         guide.deleteLater()
 

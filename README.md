@@ -58,7 +58,7 @@ Imported files are linked in place. Keep the original files. Legacy recordings h
 
 **Delete meeting** moves it to trash without deleting audio. Settings provides trash recovery, permanently removing trashed metadata, and a separate confirmed operation for unused SolScribe-owned audio. Audio referenced by any active or trashed meeting is protected. Uninstall removes the application, not the meeting library.
 
-Use **Settings → Back up meetings** for a ZIP containing a consistent database snapshot and owned audio with checksums. Imported audio stays linked and is not copied into that archive. Automatic snapshots preserve the latest five database copies; they do not copy audio. Keep periodic full archives on another drive.
+Use **Settings → Back up library** for a ZIP containing a consistent database snapshot and owned audio with checksums. Imported audio stays linked and is not copied into that archive. Automatic snapshots preserve the latest five database copies; they do not copy audio. Keep periodic full archives on another drive.
 
 Restore accepts a backup ZIP or database snapshot (`.db`) and preserves the previous database. DB-only restores require the original audio paths to remain accessible. Invalid archives and damaged transcript structures are rejected before replacement. If startup fails because the database is damaged, the startup dialog offers backup recovery. Failed writes keep edits open and retain a draft when disk space permits. Interrupted, known-owned PCM recordings can recover complete frames already written; audio never written to disk cannot be reconstructed.
 
