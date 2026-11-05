@@ -65,7 +65,10 @@ def test_recording_cleanup_only_within_managed_folder(tmp_path):
     owned.write_bytes(b'FAKE')
     sid = store.create('Internal', audio_path=str(owned))
     store.delete(sid)
-    assert not owned.exists()
+    assert owned.exists()  # Deletion is recoverable, even inside managed storage.
+    assert store.get(sid) is None
+    store.restore(sid)
+    assert store.get(sid)['audio_path'] == str(owned)
 
 
 def test_microphone_writes_valid_wave(tmp_path, monkeypatch):

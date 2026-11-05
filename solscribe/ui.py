@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from .storage import Store
+from .presentation.storage import StorageActions
 from .themes import THEMES, palette, stylesheet
 from . import __version__
 from .recorder import MicrophoneRecorder, SystemLoopbackRecorder
@@ -65,7 +66,7 @@ class ReportWorker(QThread):
             self.failed.emit(f'{type(exc).__name__}: {exc}')
 
 
-class MainWindow(QMainWindow):
+class MainWindow(StorageActions, QMainWindow):
     def __init__(self):
         super().__init__()
         self.store = Store()
@@ -84,6 +85,8 @@ class MainWindow(QMainWindow):
         self._notes_notice = ''
         self._notes_details = ''
         self._save_error = ''
+        self._storage_worker = None
+        self._storage_restoring = False
         self.recorder = MicrophoneRecorder()
         self.setWindowTitle(f'SolScribe {__version__} · Meeting notes')
         self.setMinimumSize(1000, 640)
@@ -113,7 +116,7 @@ class MainWindow(QMainWindow):
         self.reload_library(select_id=str(self.settings.value('last_session', '')))
         if not self.session_id:
             self.new_session()
-        self.statusBar().showMessage('Your recordings and transcripts are stored locally.', 7500)
+        self.statusBar().showMessage('; '.join(self.store.recovery_notices) or 'Your recordings and transcripts are stored locally.', 12000)
 
     @staticmethod
     def _label(text, role='Muted'):
@@ -477,6 +480,15 @@ class MainWindow(QMainWindow):
         advanced_toggle.toggled.connect(advanced.setVisible)
         advanced_toggle.toggled.connect(lambda checked: advanced_toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow))
         settings_layout.addWidget(advanced)
+        storage_row = QHBoxLayout()
+        for label, callback in [('Back up meetings', self.backup_meetings), ('Restore backup', self.restore_meetings), ('Trash', self.show_trash)]:
+            button = self._button(label, 'Plain')
+            button.clicked.connect(callback)
+            storage_row.addWidget(button)
+        settings_layout.addLayout(storage_row)
+        backup_hint = self._label('Backups include app-owned recordings and notes. Imported files stay in their original location; keep those separately.', 'Hint')
+        backup_hint.setWordWrap(True)
+        settings_layout.addWidget(backup_hint)
         self._engine_changed()
         settings_layout.addStretch(1)
         settings_scroll = QScrollArea()
@@ -667,7 +679,8 @@ class MainWindow(QMainWindow):
         live_working = bool(self._live_worker and self._live_worker.isRunning())
         reporting = bool(self._report_worker and self._report_worker.isRunning())
         recording = self.record_timer.isActive()
-        busy = transcribing or reporting or live_working
+        storage_busy = bool(self._storage_worker and self._storage_worker.isRunning())
+        busy = transcribing or reporting or live_working or storage_busy
         has_words = bool(self.current_session and self.current_session.get('segments'))
         self.transcript_stack.setCurrentIndex(0 if self.table.rowCount() else 1)
         if recording or live_working:
@@ -687,10 +700,12 @@ class MainWindow(QMainWindow):
         self.report_btn.setEnabled(has_words and not busy and not recording)
         self.export_btn.setEnabled(bool(has_words or any(edit.toPlainText().strip() for edit in self.doc_edits.values())) and not recording and not busy)
         for edit in self.doc_edits.values():
-            edit.setReadOnly(reporting)
+            edit.setReadOnly(reporting or storage_busy)
         has_notice = self.session_id == self._notes_session_id and bool(self._notes_notice)
         self.notes_details_btn.setVisible(has_notice and not busy and not recording)
-        if recording:
+        if storage_busy:
+            hint = 'Working on your backup. Please keep this window open…'
+        elif recording:
             hint = 'Your recording is being saved. Your words appear below.' if self.live_checkbox.isChecked() else 'Your recording is being saved. Click Stop recording when finished.'
         elif transcribing:
             hint = 'Turning your recording into text…'
@@ -710,12 +725,15 @@ class MainWindow(QMainWindow):
             hint = 'Changes are not saved yet. Check available disk space and try again.'
         self.flow_hint.setText(hint)
         self.delete_btn.setEnabled(not busy and not recording)
+        for control in (self.title_edit, self.table, self.date_edit, self.attendees_edit, self.location_edit, self.chair_edit, self.agenda_edit):
+            control.setEnabled(not storage_busy)
         for control in (self.new_btn, self.import_btn, self.paste_btn, self.demo_btn,
                         self.library, self.search_library):
             control.setEnabled(not busy and not recording)
 
     def _is_busy(self):
-        return bool((self._worker and self._worker.isRunning()) or
+        return bool((self._storage_worker and self._storage_worker.isRunning()) or
+                    (self._worker and self._worker.isRunning()) or
                     (self._report_worker and self._report_worker.isRunning()) or
                     (self._live_worker and self._live_worker.isRunning()))
 
@@ -806,7 +824,7 @@ class MainWindow(QMainWindow):
                 self.record_btn.style().polish(self.record_btn)
                 if self.session_id:
                     self.store.update(self.session_id, audio_path=str(path),
-                                      duration=self.recorder.elapsed)
+                                      duration=self.recorder.elapsed, recording_state='complete', audio_owned=True)
                     self.load_session(self.session_id)
                 if self._live_worker and self._live_worker.isRunning():
                     self._live_worker.stop()
@@ -862,7 +880,7 @@ class MainWindow(QMainWindow):
             self.recorder.live_queue = live_queue
             self.recorder.start(path, device)
             self.store.update(self.session_id, audio_path=str(path), duration=0,
-                              model='live' if live_enabled else '')
+                              model='live' if live_enabled else '', audio_owned=True, recording_state='active')
             self.current_session = self.store.get(self.session_id)
             self.audio_name.setText('Recording this meeting…')
             self.playback_controls.hide()
@@ -1132,25 +1150,6 @@ class MainWindow(QMainWindow):
             active.setText(new_title + ('  ·  transcript' if segments else ''))
         self.update_actions()
         return True
-
-    def delete_session(self):
-        if self._is_busy() or self.record_timer.isActive():
-            return
-        if not self.session_id:
-            return
-        response = QMessageBox.question(self, 'Delete meeting',
-            'Delete this session, transcript, minutes and memo?\n\nImported source files will not be deleted.',
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        if response != QMessageBox.Yes:
-            return
-        self.save_timer.stop()
-        self.player.stop()
-        self.store.delete(self.session_id)
-        self.session_id = None
-        self.current_session = None
-        self.reload_library()
-        if not self.session_id:
-            self.new_session()
 
     def current_section(self):
         return {0: 'Transcript', 1: 'Summary', 2: 'Minutes', 3: 'Memo', 4: 'Action items'}.get(self.tabs.currentIndex(), 'Transcript')

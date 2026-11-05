@@ -242,3 +242,20 @@ def test_formatted_notes_round_trip_and_export_without_visible_markup(window, tm
     assert 'Meeting notes' in paragraphs
     assert 'Decisions' in paragraphs
     assert 'Launch approved' in paragraphs
+
+
+def test_backup_restore_ui_runs_in_worker_and_recovers_notes(window, monkeypatch, tmp_path):
+    window.load_demo()
+    sid = window.session_id
+    window.doc_edits['Summary'].setPlainText('Original notes')
+    path = tmp_path / 'backup.zip'
+    monkeypatch.setattr(ui.QFileDialog, 'getSaveFileName', lambda *args: (str(path), ''))
+    window.backup_meetings()
+    until(lambda: not window._is_busy() and path.exists())
+    window.doc_edits['Summary'].setPlainText('Later edits')
+    window.persist()
+    monkeypatch.setattr(ui.QFileDialog, 'getOpenFileName', lambda *args: (str(path), ''))
+    monkeypatch.setattr(ui.QMessageBox, 'question', lambda *args: ui.QMessageBox.Yes)
+    window.restore_meetings()
+    until(lambda: not window._is_busy() and window.store.get(sid)['summary'] == 'Original notes')
+    assert not window.doc_edits['Summary'].isReadOnly()
