@@ -1,6 +1,7 @@
 """Official release validation and installer integrity; no meeting data involved."""
 from dataclasses import dataclass
 import hashlib
+import os
 import re
 from pathlib import Path
 from urllib.parse import quote, urlsplit
@@ -91,3 +92,16 @@ def verify_installer(path, update):
     if digest.hexdigest() != update.sha256:
         raise ValueError('The downloaded update could not be verified. Please download it again')
     return path
+
+
+def mark_internet_download(path, source_url):
+    """Keep Windows attachment-origin checks for files fetched inside the app."""
+    if os.name == 'nt':
+        if not trusted_url(source_url, download=True):
+            raise ValueError('Unexpected installer origin')
+        # Mark the staged file before atomic promotion; NTFS retains the stream
+        # across rename. Do not strip this information or bypass ShellExecute.
+        with open(str(path) + ':Zone.Identifier', 'w', encoding='utf-8') as stream:
+            stream.write('[ZoneTransfer]\nZoneId=3\nHostUrl=' + source_url + '\n')
+            stream.flush()
+            os.fsync(stream.fileno())

@@ -1,5 +1,6 @@
 """Opt-in real HTTPS update verification; test files are never executed."""
 import json
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -27,6 +28,11 @@ def update_smoke(output):
         def downloaded(path):
             try:
                 verify_installer(path, result.pop('update'))
+                if os.name == 'nt':
+                    zone = Path(str(path) + ':Zone.Identifier').read_text(encoding='utf-8')
+                    if 'ZoneId=3' not in zone:
+                        raise ValueError('Windows attachment-origin marker is missing')
+                    result['windows_internet_origin_preserved'] = True
             except (OSError, ValueError):
                 failed('Downloaded installer failed independent verification')
                 return

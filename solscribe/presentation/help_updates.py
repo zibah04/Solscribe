@@ -1,6 +1,5 @@
 """Guide and update presentation, with saved work protected before installation."""
 import os
-import subprocess
 import time
 from pathlib import Path
 from PySide6.QtCore import QTimer, QUrl
@@ -9,7 +8,7 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushBu
 from .. import __release_tag__
 from ..jobs import OperationWorker
 from ..update_transport import UpdateClient
-from ..updates import verify_installer
+from ..updates import verify_installer, mark_internet_download
 from .welcome import QuickGuide
 
 
@@ -244,6 +243,7 @@ class HelpUpdates:
         self._show_update_state('preparing')
         def prepare():
             verify_installer(path, update)
+            mark_internet_download(path, update.url)
             self.store.backup_database()
             return path
         worker = OperationWorker(prepare, self)
@@ -269,4 +269,4 @@ class HelpUpdates:
 
     @staticmethod
     def _launch_update_installer(path):
-        subprocess.Popen([str(path)], shell=False)
+        os.startfile(str(path), 'open')

@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest, QNetworkProxyFactory
 from . import __version__
-from .updates import RELEASES_API, select_update, trusted_url
+from .updates import RELEASES_API, select_update, trusted_url, mark_internet_download
 
 
 class UpdateClient(QObject):
@@ -151,6 +151,7 @@ class UpdateClient(QObject):
                 os.fsync(self.file.fileno())
                 self.file.close()
                 self.file = None
+                mark_internet_download(self.part, self.update.url)
                 destination = self.part.parent / self.update.filename
                 os.replace(self.part, destination)
                 self.part = None

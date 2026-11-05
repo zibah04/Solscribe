@@ -213,6 +213,15 @@ def test_recording_blocks_update_installation(window, monkeypatch):
     assert 'Finish the current recording' in window.update_status_label.text()
 
 
+def test_installer_handoff_uses_windows_normal_file_open(monkeypatch):
+    from solscribe.presentation import help_updates
+    calls = []
+    monkeypatch.setattr(help_updates.os, 'startfile', lambda *args: calls.append(args), raising=False)
+    path = Path('installer path with spaces.exe')
+    help_updates.HelpUpdates._launch_update_installer(path)
+    assert calls == [(str(path), 'open')]
+
+
 def test_update_checks_are_opt_in_and_throttled(window, monkeypatch, app):
     calls = []
     monkeypatch.setattr(window._update_client, 'check', lambda **kwargs: calls.append(kwargs))
