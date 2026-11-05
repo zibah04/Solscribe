@@ -1,0 +1,75 @@
+{
+  "id": 435387487,
+  "tag_name": "v0.5.0-beta.1",
+  "target_commitish": "53d08ba08860e09a4878ff31680e3d62297c0d76",
+  "html_url": "https://github.com/zibah04/Solscribe/releases/tag/untagged-7b5815763aea643f22cd",
+  "draft": true,
+  "prerelease": true,
+  "verified_build_run": 42057519632,
+  "private_staging_run": 42058974658,
+  "assets": [
+    {
+      "id": 713929167,
+      "name": "BUILD_INFO.txt",
+      "size": 110,
+      "digest": "sha256:12378bdc5b05d554f7921ab54cf7d15cd3766c1c8e4fc232ecbed156b9803674",
+      "state": "uploaded"
+    },
+    {
+      "id": 713929377,
+      "name": "LICENSE",
+      "size": 1100,
+      "digest": "sha256:8f9dc39341fd07beb470f040fe5f33e26e9a104d7e44ae92e7f6cc06094bf2e6",
+      "state": "uploaded"
+    },
+    {
+      "id": 713929088,
+      "name": "RELEASE_NOTES.md",
+      "size": 6693,
+      "digest": "sha256:74d70a2b9752392f7f7f16c3bdb3331f75487e6cebfa7b682d4a68f13e31b496",
+      "state": "uploaded"
+    },
+    {
+      "id": 713929476,
+      "name": "requirements-tested-windows.txt",
+      "size": 978,
+      "digest": "sha256:9c1f0f418cc57315a787991befdf962b9e564d184a22568d05eda46915cd5c96",
+      "state": "uploaded"
+    },
+    {
+      "id": 713928811,
+      "name": "SHA256SUMS.txt",
+      "size": 191,
+      "digest": "sha256:149324de77abc1157f7f02bfdaa580d1d565a28c451089c11a1be66ddfeb6dcb",
+      "state": "uploaded"
+    },
+    {
+      "id": 713929260,
+      "name": "SIGNING_STATUS.txt",
+      "size": 824,
+      "digest": "sha256:104befba5eaec7db7a75bac0ad2fc3b68d7d453b76cefa5c7c15fbf4925d70c4",
+      "state": "uploaded"
+    },
+    {
+      "id": 713928257,
+      "name": "SolScribe-Portable-Windows.zip",
+      "size": 170389328,
+      "digest": "sha256:75233e34df2c31624a1efa6599c3da011041001529259a44bfcbe671500bd5d1",
+      "state": "uploaded"
+    },
+    {
+      "id": 713927883,
+      "name": "SolScribe-Setup-0.5.0.exe",
+      "size": 113083533,
+      "digest": "sha256:bed47c4f96f30d022e916eb76f4b2655169e51aac6e47f97a567b72b12d9f653",
+      "state": "uploaded"
+    },
+    {
+      "id": 713928989,
+      "name": "START_HERE.txt",
+      "size": 3637,
+      "digest": "sha256:3956411f0829f899c56cf87b9353932feddc10b7d276f8e3a2544cff9ce93139",
+      "state": "uploaded"
+    }
+  ]
+}

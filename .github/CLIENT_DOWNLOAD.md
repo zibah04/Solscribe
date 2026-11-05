@@ -11,3 +11,5 @@ After separate approval and publication, the new direct installer URL will be:
 That URL is not public while 0.5.0 remains a draft. Release downloads do not have the 30-day Actions retention limit. All unsigned-beta and lecture-quality limitations remain; see `docs/050_REPORT.md`.
 
 The old `stage-client-download.yml` still targets only the preserved private 0.4.1 draft/run 42035906513 and is not used for 0.5.0. The previously approved 0.4.0 public release remains unchanged.
+
+Private staging run 42058974658 completed successfully. All nine attached files were verified; binary sizes and hashes are retained in `docs/validation/050/private-release.json`. Owner review: https://github.com/zibah04/Solscribe/releases/tag/untagged-7b5815763aea643f22cd .

@@ -1,6 +1,6 @@
 # 0.5.0 lecture-mode verification
 
-Status: final Windows and Linux verification passed. Installer and portable build are being staged in a private release draft. No public 0.5.0 release has been published or main merged.
+Status: final Windows and Linux verification passed. The installer (113,083,533 bytes), portable ZIP (170,389,328 bytes) and seven supporting files are checksum-verified in the [private beta draft](https://github.com/zibah04/Solscribe/releases/tag/untagged-7b5815763aea643f22cd). [Private staging run 42058974658](https://github.com/zibah04/Solscribe/actions/runs/42058974658) passed. No public 0.5.0 release has been published or main merged.
 
 Source: `53d08ba08860e09a4878ff31680e3d62297c0d76` on `codex/solscribe-050-lecture-mode`.
 

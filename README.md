@@ -1,6 +1,6 @@
 # SolScribe
 
-Private meeting and lecture recording, transcripts and useful notes for Windows 10/11 x64. SolScribe 0.4.0 is a **beta**: light and dark themes retain the familiar purple palette, with a simpler workspace that adapts to smaller displays.
+Private meeting and lecture recording, transcripts and useful notes for Windows 10/11 x64. SolScribe is a **beta**: light and dark themes retain the familiar purple palette, with a simpler workspace that adapts to smaller displays.
 
 The 0.5.0 beta source includes verified in-app updates, an optional four-step first-use guide, and the `zibah@2026` footer from the validated 0.4.1 work. **Lecture** mode adds study notes, key concepts, explicit definitions and examples, editable revision cards with revealable answers, and timestamped original excerpts. Meeting documents and study notes are saved separately. See [lecture usage](docs/LECTURE_MODE.md), [update delivery](docs/UPDATES.md) and [0.5.0 verification](docs/050_REPORT.md).
 
