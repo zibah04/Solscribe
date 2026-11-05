@@ -1,0 +1,19 @@
+{
+  "scope": "Prerecorded synthetic speech queued immediately; not microphone or real-time caption latency.",
+  "model": "tiny",
+  "compute_type": "int8",
+  "device": "cpu",
+  "audio_s": 11.135,
+  "ready_s": 3.7232031000000916,
+  "first_caption_s_including_model_start": 4.3065196000000014,
+  "processed_until_s": 11.135,
+  "skipped_s": 0.0,
+  "window_count_sampled": 6,
+  "mean_processing_s": 0.4978285999999912,
+  "max_processing_s": 0.5832108999999264,
+  "total_s_including_model_start": 6.860038099999997,
+  "decode_and_drain_s": 3.1368349999999054,
+  "decode_and_drain_real_time_factor": 0.281709474629538,
+  "segments": 6,
+  "recognized_expected_keywords": true
+}

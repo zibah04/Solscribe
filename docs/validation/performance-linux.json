@@ -1,0 +1,26 @@
+{
+  "version": "0.4.0",
+  "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "python": "3.12.14",
+  "architecture": "x86_64",
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "logical_cpus": 5,
+  "physical_ram_bytes": 35743748096,
+  "scope": "Synthetic local data, offscreen UI; no speech model, disk microphone, or physical-device latency.",
+  "startup_imports_and_first_window_s": 0.5977,
+  "idle_rss_bytes": 86765568,
+  "transcript_rows": 10000,
+  "load_and_render_s": 0.7472,
+  "loaded_rss_bytes": 116375552,
+  "quick_notes_s": 0.5268,
+  "persist_all_rows_s": 0.2663,
+  "synthetic_90min_stream": {
+    "source_seconds": 5400.0,
+    "wall_s": 0.6457,
+    "traced_current_bytes": 76264,
+    "traced_peak_bytes": 461686,
+    "retained_context_frames": 16000,
+    "sampled_processing_windows": 256,
+    "recognizer": "FakeRecognizer; buffer retention only"
+  }
+}
